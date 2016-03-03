@@ -1,5 +1,3 @@
-/* crt0.S - crt0 module for the IA-32 boards */
-
 /*
  * Copyright (c) 2010-2015 Wind River Systems, Inc.
  *
@@ -15,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
-DESCRIPTION
-This module contains the initial code executed by the Zephyr Kernel ELF image
-after having been loaded into RAM.
-*/	
+/**
+ * @file
+ * @brief Crt0 module for the IA-32 boards
+ *
+ * This module contains the initial code executed by the Zephyr Kernel ELF image
+ * after having been loaded into RAM.
+ */
 
 #define _ASMLANGUAGE
 
@@ -34,6 +34,10 @@ after having been loaded into RAM.
 
 	GDATA(_idt_base_address)
 	GDATA(_interrupt_stack)
+	GDATA(_Idt)
+#ifndef CONFIG_GDT_DYNAMIC
+	GDATA(_gdt)
+#endif
 
 
 #if defined(CONFIG_SSE)
@@ -87,7 +91,7 @@ SECTION_FUNC(TEXT_START, __start)
 	 * booted operating systems to setup their own IDT and GDT.
 	 */
 
-	lgdt	_GdtRom		/* load 32-bit operand size GDT */
+	lgdt	_gdt_rom		/* load 32-bit operand size GDT */
 	lidt	_Idt		/* load 32-bit operand size IDT */
 
 
@@ -108,12 +112,7 @@ SECTION_FUNC(TEXT_START, __start)
 	movw	%ax, %gs	/* set GS */
 	movw	%ax, %ss	/* set SS */
 
-	/* this is 'ljmp $0x08:$_csSet': diab 5.9.1.0 does not encode
-	 * it correctly */
-	.byte 0xea
-	.long __csSet
-	.byte 0x08
-	.byte 0x00
+	ljmp	$0x08, $__csSet	/* set CS = 0x08 */
 
 __csSet:
 #endif /* CONFIG_BOOTLOADER_UNKNOWN */
@@ -301,10 +300,10 @@ memInitDone:
 
 	andl	$0xfffffffc, %esp
 
+#ifdef CONFIG_GDT_DYNAMIC
 	/* activate RAM-based Global Descriptor Table (GDT) */
-
 	lgdt	%ds:_gdt
-
+#endif
 
 
 #if defined (CONFIG_ADVANCED_IDLE)
@@ -383,9 +382,12 @@ _Idt:
 #endif /* CONFIG_BOOTLOADER_UNKNOWN */
 
 
-_GdtRom:
-	.word _GdtRomEnd - _GdtRomEntries - 1   /* Limit on GDT */
-	.long _GdtRomEntries			/* table address: _GdtRomEntries */
+#ifndef CONFIG_GDT_DYNAMIC
+_gdt:
+#endif
+_gdt_rom:
+	.word _gdt_rom_end - _gdt_rom_entries - 1   /* Limit on GDT */
+	.long _gdt_rom_entries			/* table address: _gdt_rom_entries */
 
 
 	.balign 16,0x90
@@ -405,7 +407,7 @@ _GdtRom:
 	 * in ROM, since such use is not planned for this platform.
 	 */
 
-_GdtRomEntries:
+_gdt_rom_entries:
 
 	/* Entry 0 (selector=0x0000): The "NULL descriptor" */
 
@@ -434,7 +436,7 @@ _GdtRomEntries:
 	.byte   0xcf		/* limit: fxxxx, Page Gra, 32bit */
 	.byte   0x00		/* base : 00xxxxxx */
 
-_GdtRomEnd:
+_gdt_rom_end:
 
 #ifdef CONFIG_ADVANCED_IDLE
 	.section .NOINIT

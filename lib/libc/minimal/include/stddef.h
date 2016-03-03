@@ -19,18 +19,12 @@
 #ifndef __INC_stddef_h__
 #define __INC_stddef_h__
 
-#if !defined(__size_t_defined)
-#define __size_t_defined
-typedef unsigned int  size_t;
-#endif
+#include <bits/null.h>
+#include <bits/size_t.h>
 
 #if !defined(__ptrdiff_t_defined)
 #define __ptrdiff_t_defined
 typedef int  ptrdiff_t;
-#endif
-
-#if !defined(NULL)
-#define NULL (void *) 0
 #endif
 
 #define offsetof(type, member) ((size_t) (&((type *) NULL)->member))

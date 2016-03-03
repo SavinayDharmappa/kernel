@@ -1,5 +1,3 @@
-/* sections.h - Definitions of various linker Sections. */
-
 /*
  * Copyright (c) 2013-2014, Wind River Systems, Inc.
  *
@@ -16,9 +14,12 @@
  * limitations under the License.
  */
 
-/*
-  DESCRIPTION
-  Linker Section declarations used by linker script, C files and Assembly files.
+/**
+ * @file
+ * @brief Definitions of various linker Sections.
+ *
+ * Linker Section declarations used by linker script, C files and Assembly
+ * files.
  */
 
 #ifndef _SECTIONS_H
@@ -36,7 +37,7 @@
 
 /* Various text section names */
 #define TEXT text
-#if defined(CONFIG_X86_32)
+#if defined(CONFIG_X86)
 #define TEXT_START text_start /* beginning of TEXT section */
 #else
 #define TEXT_START text /* beginning of TEXT section */
@@ -52,12 +53,6 @@
 #define SCS_SECTION scs
 #define SCP_SECTION scp
 
-#ifdef CONFIG_SW_ISR_TABLE_DYNAMIC
-#define ISR_TABLE_SECTION  DATA
-#else  /* !CONFIG_SW_ISR_TABLE_DYNAMIC */
-#define ISR_TABLE_SECTION  RODATA
-#endif /* CONFIG_SW_ISR_TABLE_DYNAMIC */
-
 #define SECURITY_FRDM_K64F  security_frdm_k64f
 #define IRQ_VECTOR_TABLE    irq_vector_table
 
@@ -66,12 +61,6 @@
 #endif  /* CONFIG_GDB_INFO && !CONFIG_SW_ISR_TABLE */
 
 #elif defined(CONFIG_ARC)
-
-	#ifdef CONFIG_SW_ISR_TABLE_DYNAMIC
-		#define ISR_TABLE_SECTION  DATA
-	#else
-		#define ISR_TABLE_SECTION  RODATA
-	#endif
 
 	#define IRQ_VECTOR_TABLE irq_vector_table
 

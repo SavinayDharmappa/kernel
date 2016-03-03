@@ -1,5 +1,3 @@
-/* ISR table for static ISR declarations for ARM */
-
 /*
  * Copyright (c) 2015 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Software ISR table for ARM
+/**
+ * @file
+ * @brief ISR table for static ISR declarations for ARM
+ *
+ * Software ISR table for ARM
  */
 
 #define _ASMLANGUAGE
@@ -30,7 +30,7 @@ Software ISR table for ARM
 _ASM_FILE_PROLOGUE
 
 /*
- * enable proprocessor features, such
+ * enable preprocessor features, such
  * as %expr - evaluate the expression and use it as a string
  */
 .altmacro
@@ -49,13 +49,13 @@ _ASM_FILE_PROLOGUE
 
 /*
  * Declare the ISR table
- * Macro is recursive
  */
 .macro _isr_table_declare from, to
-	_isr_table_entry_declare \from
-	.if \to-\from
-		_isr_table_declare %(\from + 1), \to
-	.endif
+	counter = \from
+	.rept (\to - \from + 1)
+		_isr_table_entry_declare %counter
+		counter = counter + 1
+	.endr
 .endm
 
 GTEXT(_irq_spurious)

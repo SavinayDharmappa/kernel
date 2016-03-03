@@ -1,5 +1,3 @@
-/* exc_exit.S - ARM CORTEX-M3 exception/interrupt exit API */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,12 +14,14 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Provides functions for performing kernel handling when exiting exceptions or
-interrupts that are installed directly in the vector table (i.e. that are not
-wrapped around by _isr_wrapper()).
+/**
+ * @file
+ * @brief ARM CORTEX-M3 exception/interrupt exit API
+ *
+ *
+ * Provides functions for performing kernel handling when exiting exceptions or
+ * interrupts that are installed directly in the vector table (i.e. that are not
+ * wrapped around by _isr_wrapper()).
  */
 
 #define _ASMLANGUAGE
@@ -37,7 +37,7 @@ GTEXT(_ExcExit)
 GTEXT(_IntExit)
 GDATA(_nanokernel)
 
-#if defined(CONFIG_GDB_INFO) || defined(CONFIG_ARM_DEBUG_ESF)
+#if CONFIG_GDB_INFO
   #define _EXIT_EXC_IF_FIBER_PREEMPTED beq _ExcExitWithGdbStub
 #else
   _EXIT_EXC_IF_FIBER_PREEMPTED:      .macro

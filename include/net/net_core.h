@@ -1,7 +1,7 @@
 /** @file
- @brief Network core definitions
-
- Definitions for networking support.
+ * @brief Network core definitions
+ *
+ * Definitions for networking support.
  */
 
 /*
@@ -22,6 +22,10 @@
 
 #ifndef __NET_CORE_H
 #define __NET_CORE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Network subsystem logging helpers */
 
@@ -53,7 +57,7 @@ struct net_driver {
 	size_t head_reserve;
 
 	/** Open the net transport */
-	int (*open) (void);
+	int (*open)(void);
 
 	/** Send data to net. The send() function should return:
 	 * 0 : If packet could not be sent. In this case buf should
@@ -64,7 +68,7 @@ struct net_driver {
 	 * <0: If there is an error, the buf should not be released by
 	 *     send() function.
 	 */
-	int (*send) (struct net_buf *buf);
+	int (*send)(struct net_buf *buf);
 };
 
 /**
@@ -110,8 +114,8 @@ int net_set_mac(uint8_t *mac, uint8_t len);
  *
  * @details Application can call this function if it has received
  * a network packet from peer. The application needs to write
- * reply data into net_buf. The app can use net_buf_data(buf) and
- * net_buf_datalen(buf) to set the application data and length.
+ * reply data into net_buf. The app can use ip_buf_appdata(buf) and
+ * ip_buf_appdatalen(buf) to set the application data and length.
  *
  * @param context Network context
  * @param buf Network buffer containing the network data.
@@ -124,5 +128,9 @@ int net_reply(struct net_context *context, struct net_buf *buf);
 int net_recv(struct net_buf *buf);
 
 void net_context_init(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NET_CORE_H */

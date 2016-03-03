@@ -1,5 +1,3 @@
-/* k_ticker.c - microkernel tick event handler */
-
 /*
  * Copyright (c) 1997-2010, 2012-2015 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements the microkernel's tick event handler.
+/**
+ * @file
+ * @brief Microkernel tick event handler
+ *
+ * This module implements the microkernel's tick event handler.
  */
 
 #include <nanokernel.h>
@@ -31,8 +31,6 @@ This module implements the microkernel's tick event handler.
 #include <toolchain.h>
 #include <sections.h>
 
-int64_t _k_sys_clock_tick_count = 0;
-
 #ifdef CONFIG_TIMESLICING
 static int32_t slice_count = (int32_t)0;
 static int32_t slice_time = (int32_t)CONFIG_TIMESLICE_SIZE;
@@ -42,50 +40,8 @@ static kpriority_t slice_prio =
 
 #ifdef CONFIG_TICKLESS_IDLE
 /* Number of ticks elapsed that have not been announced to the microkernel */
-int32_t _sys_idle_elapsed_ticks = 0; /* Initial value must be 0 */
+int32_t _sys_idle_elapsed_ticks; /* Initial value must be 0 */
 #endif
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-int sys_clock_us_per_tick = 1000000 / sys_clock_ticks_per_sec;
-int sys_clock_hw_cycles_per_tick =
-	sys_clock_hw_cycles_per_sec / sys_clock_ticks_per_sec;
-#else
-/* don't initialize to avoid division-by-zero error */
-int sys_clock_us_per_tick;
-int sys_clock_hw_cycles_per_tick;
-#endif
-
-int32_t task_tick_get_32(void)
-{
-	return (int32_t)_k_sys_clock_tick_count;
-}
-
-int64_t task_tick_get(void)
-{
-	int64_t ticks;
-	int key = irq_lock();
-
-	ticks = _k_sys_clock_tick_count;
-	irq_unlock(key);
-	return ticks;
-}
-
-/**
- *
- * @brief Increment system clock by "N" ticks
- *
- * Interrupts are locked while updating clock since some CPUs do not support
- * native atomic operations on 64 bit values.
- * @param inc Increment
- * @return N/A
- */
-static void sys_clock_increment(int inc)
-{
-	int key = irq_lock();
-
-	_k_sys_clock_tick_count += inc;
-	irq_unlock(key);
-}
 
 /**
  * @internal
@@ -146,7 +102,6 @@ static inline void _TimeSliceUpdate(void)
  *
  * @return number of ticks to process
  */
-
 static inline int32_t _SysIdleElapsedTicksGet(void)
 {
 #ifdef CONFIG_TICKLESS_IDLE
@@ -185,8 +140,7 @@ int _k_ticker(int event)
 	if (_TlDebugUpdate(ticks)) {
 		_TimeSliceUpdate();
 		_k_timer_list_update(ticks);
-		sys_clock_increment(ticks);
-		_nano_sys_clock_tick_announce((uint32_t)ticks);
+		_nano_sys_clock_tick_announce(ticks);
 	}
 
 	return 1;
@@ -201,32 +155,3 @@ void sys_scheduler_time_slice_set(int32_t t, kpriority_t p)
 }
 
 #endif /* CONFIG_TIMESLICING */
-
-/**
- *
- * @brief Handle elapsed ticks calculation request
- *
- * This routine, called by _k_server(), handles the request for calculating the
- * time elapsed since the specified reference time.
- *
- * @return N/A
- */
-void _k_time_elapse(struct k_args *P)
-{
-	int64_t now = task_tick_get();
-
-	P->args.c1.time2 = now - P->args.c1.time1;
-	P->args.c1.time1 = now;
-}
-
-int64_t task_tick_delta(int64_t *reftime /* pointer to reference time */
-			)
-{
-	struct k_args A;
-
-	A.Comm = _K_SVC_TIME_ELAPSE;
-	A.args.c1.time1 = *reftime;
-	KERNEL_ENTRY(&A);
-	*reftime = A.args.c1.time1;
-	return A.args.c1.time2;
-}

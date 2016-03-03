@@ -45,6 +45,4 @@ static int ram_console_init(struct device *d)
 	return DEV_OK;
 }
 
-DECLARE_DEVICE_INIT_CONFIG(ram_console, "", ram_console_init, NULL);
-pre_kernel_early_init(ram_console, NULL);
-
+SYS_INIT(ram_console_init, PRIMARY, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);

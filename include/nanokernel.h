@@ -222,15 +222,29 @@ extern void fiber_abort(void);
 /**
  * @brief Put the current fiber to sleep
  *
- * Put the currently running fiber to sleep for an amount of system ticks
- * passed in the timeout_in_ticks parameter.
+ * Put the currently running fiber to sleep for the number of system ticks
+ * passed in the @a timeout_in_ticks parameter.
  *
- * @param timeout number of system ticks to sleep
+ * @param timeout_in_ticks Number of system ticks to sleep
  *
- * @return None
+ * @return N/A
  */
-extern void fiber_sleep(int32_t timeout);
+extern void fiber_sleep(int32_t timeout_in_ticks);
 
+#ifndef CONFIG_MICROKERNEL
+/**
+ * @brief Put the task to sleep
+ *
+ * Put the task to sleep for the number of system ticks passed in the
+ * @a timeout_in_ticks parameter.
+ *
+ * @param timeout_in_ticks Number of system ticks to sleep. A value of
+ * TICKS_UNLIMITED is considered invalid and may result in unexpected behavior.
+ *
+ * @return N/A
+ */
+extern void task_sleep(int32_t timeout_in_ticks);
+#endif
 
 /**
  * @brief start a fiber, but delay its execution
@@ -263,7 +277,7 @@ extern void fiber_delayed_start_cancel(void *handle);
  *
  * @param handle A handle returned when asking to start the fiber
  *
- * @return None
+ * @return N/A
  */
 extern void fiber_fiber_delayed_start_cancel(void *handle);
 #endif
@@ -319,6 +333,9 @@ struct nano_fifo {
 		struct _nano_queue data_q;
 	};
 	int stat;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct nano_fifo *next;
+#endif
 };
 
 /**
@@ -367,34 +384,27 @@ extern void nano_fifo_put(struct nano_fifo *fifo, void *data);
  *
  * @brief Get an element from the head a fifo
  *
- * Remove the head element from the specified nanokernel multiple-waiter fifo
- * linked list fifo; it may be called from a fiber, task, or ISR context.
+ * This is a convenience wrapper for the execution of context specific APIs.
+ * It is helpful whenever the exact execution context is not known. Its use
+ * should be avoided whenever the context is known up-front (to avoid
+ * unnecessary overhead).
  *
  * If no elements are available, NULL is returned.  The first word in the
  * element contains invalid data because that memory location was used to store
  * a pointer to the next element in the linked list.
  *
  * @param fifo FIFO on which to interact.
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks
+ * before timing out.
+ *
+ * @warning If it is to be called from the context of an ISR, then @a
+ * timeout_in_ticks must be set to TICKS_NONE.
  *
  * @return Pointer to head element in the list if available, otherwise NULL
  */
-extern void *nano_fifo_get(struct nano_fifo *fifo);
-
-/**
- *
- * @brief Get the head element of a fifo, poll/pend if empty
- *
- * This is a convenience wrapper for the execution context-specific APIs. This
- * is helpful whenever the exact execution context is not known, but should be
- * avoided when the context is known up-front (to avoid unnecessary overhead).
- *
- * @warning It's only valid to call this API from a fiber or a task.
- *
- * @param fifo FIFO on which to interact.
- *
- * @return Pointer to head element in the list
- */
-extern void *nano_fifo_get_wait(struct nano_fifo *fifo);
+extern void *nano_fifo_get(struct nano_fifo *fifo, int32_t timeout_in_ticks);
 
 /*
  * methods for ISRs
@@ -425,10 +435,11 @@ extern void nano_isr_fifo_put(struct nano_fifo *fifo, void *data);
  * location was used to store a pointer to the next element in the linked list.
  *
  * @param fifo FIFO on which to interact.
+ * @param timeout_in_ticks Always use TICKS_NONE.
  *
  * @return Pointer to head element in the list if available, otherwise NULL
  */
-extern void *nano_isr_fifo_get(struct nano_fifo *fifo);
+extern void *nano_isr_fifo_get(struct nano_fifo *fifo, int32_t timeout_in_ticks);
 
 /* methods for fibers */
 
@@ -457,58 +468,15 @@ extern void nano_fiber_fifo_put(struct nano_fifo *fifo, void *data);
  * location was used to store a pointer to the next element in the linked list.
  *
  * @param fifo FIFO on which to interact.
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
  * @return Pointer to head element in the list if available, otherwise NULL
  */
-extern void *nano_fiber_fifo_get(struct nano_fifo *fifo);
-
-/**
- *
- * @brief Get the head element of a fifo, wait if empty
- *
- * Remove the head element from the specified system-level multiple-waiter
- * fifo; it can only be called from a fiber.
- *
- * If no elements are available, the calling fiber will pend until an element
- * is put onto the fifo.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked list.
- *
- * @param fifo FIFO on which to interact.
- *
- * @return Pointer to head element in the list
- *
- * @note There exists a separate nano_task_fifo_get_wait() implementation
- * since a task cannot pend on a nanokernel object. Instead tasks will
- * poll the fifo object.
- */
-extern void *nano_fiber_fifo_get_wait(struct nano_fifo *fifo);
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief get the head element of a fifo, pend with a timeout if empty
- *
- * Remove the head element from the specified nanokernel fifo; it can only be
- * called from a fiber.
- *
- * If no elements are available, the calling fiber will pend until an element
- * is put onto the fifo, or the timeout expires, whichever comes first.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked
- * list.
- *
- * @sa nano_task_stack_pop_wait()
- *
- * @param fifo the FIFO on which to interact.
- * @param timeout_in_ticks time to wait in ticks
- *
- * @return Pointer to head element in the list, NULL if timed out
- */
-extern void *nano_fiber_fifo_get_wait_timeout(struct nano_fifo *fifo,
-		int32_t timeout_in_ticks);
-#endif
+extern void *nano_fiber_fifo_get(struct nano_fifo *fifo,
+			int32_t timeout_in_ticks);
 
 /* methods for tasks */
 
@@ -530,53 +498,25 @@ extern void *nano_fiber_fifo_get_wait_timeout(struct nano_fifo *fifo,
  */
 extern void nano_task_fifo_put(struct nano_fifo *fifo, void *data);
 
-extern void *nano_task_fifo_get(struct nano_fifo *fifo);
-
 /**
+ * @brief Get an element from the head of a FIFO from a task, poll if empty
  *
- * @brief Get the head element of a fifo, poll if empty
- *
- * Remove the head element from the specified system-level multiple-waiter
- * fifo; it can only be called from a task.
- *
- * If no elements are available, the calling task will poll until an
- * until an element is put onto the fifo.
+ * Remove the head element from the specified nanokernel multiple-waiter fifo
+ * linked list fifo. It may be called from a task.
  *
  * The first word in the element contains invalid data because that memory
  * location was used to store a pointer to the next element in the linked list.
  *
  * @param fifo FIFO on which to interact.
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then poll as
+ * long as necessary. Otherwise poll up to the specified number of ticks have
+ * elapsed before timing out.
  *
- * @sa nano_task_stack_pop_wait()
- *
- * @return Pointer to head element in the list
+ * @return Pointer to head element in the list if available, otherwise NULL
  */
-extern void *nano_task_fifo_get_wait(struct nano_fifo *fifo);
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief get the head element of a fifo, poll with a timeout if empty
- *
- * Remove the head element from the specified nanokernel fifo; it can only be
- * called from a task.
- *
- * If no elements are available, the calling task will poll until an element
- * is put onto the fifo, or the timeout expires, whichever comes first.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked
- * list.
- *
- * @sa nano_task_stack_pop_wait()
- *
- * @param fifo the FIFO on which to operate
- * @param timeout_in_ticks time to wait in ticks
- *
- * @return Pointer to head element in the list, NULL if timed out
- */
-extern void *nano_task_fifo_get_wait_timeout(struct nano_fifo *fifo,
-		int32_t timeout_in_ticks);
-#endif
+extern void *nano_task_fifo_get(struct nano_fifo *fifo,
+			int32_t timeout_in_ticks);
 
 /* LIFO APIs */
 
@@ -590,6 +530,9 @@ extern void *nano_task_fifo_get_wait_timeout(struct nano_fifo *fifo,
 struct nano_lifo {
 	struct _nano_queue wait_q;
 	void *list;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct nano_lifo *next;
+#endif
 };
 
 /**
@@ -605,6 +548,41 @@ struct nano_lifo {
  * @return N/A
  */
 extern void nano_lifo_init(struct nano_lifo *lifo);
+
+/**
+ * @brief Prepend an element to a LIFO
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param lifo LIFO on which to put.
+ * @param data Data to insert.
+ *
+ * @return N/A
+ */
+extern void nano_lifo_put(struct nano_lifo *lifo, void *data);
+
+/**
+ * @brief Get the first element from a LIFO
+ *
+ * This is a convenience wrapper for the execution of context specific APIs.
+ * It is helpful whenever the exact execution context is not known. Its use
+ * should be avoided whenever the context is known up-front (to avoid
+ * unnecessary overhead).
+ *
+ * @param lifo LIFO on which to receive
+ * @param timeout_in_ticks Affects the action taken should the LIFO be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necesssary. Otherwise wait up to the specified number of ticks
+ * before timing out.
+ *
+ * @warning If it is to be called from the context of an ISR, then @a
+ * timeout_in_ticks must be set to TICKS_NONE.
+ *
+ * @return Pointer to first element in the list if available, otherwise NULL
+ */
+extern void *nano_lifo_get(struct nano_lifo *lifo, int32_t timeout_in_ticks);
 
 /* methods for ISRs */
 
@@ -633,10 +611,12 @@ extern void nano_isr_lifo_put(struct nano_lifo *lifo, void *data);
  * a pointer to the next element in the linked list.
  *
  * @param lifo LIFO from which to receive.
+ * @param timeout_in_ticks Always use TICKS_NONE.
  *
  * @return Pointer to first element in the list if available, otherwise NULL
  */
-extern void *nano_isr_lifo_get(struct nano_lifo *lifo);
+extern void *nano_isr_lifo_get(struct nano_lifo *lifo,
+		int32_t timeout_in_ticks);
 
 /* methods for fibers */
 
@@ -665,52 +645,15 @@ extern void nano_fiber_lifo_put(struct nano_lifo *lifo, void *data);
  * a pointer to the next element in the linked list.
  *
  * @param lifo LIFO from which to receive
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
  * @return Pointer to first element in the list if available, otherwise NULL
  */
-extern void *nano_fiber_lifo_get(struct nano_lifo *lifo);
-
-/**
- * @brief Get the first element from a LIFO, wait if empty.
- *
- * Remove the first element from the specified system-level linked list LIFO;
- * it can only be called from a fiber.
- *
- * If no elements are available, the calling fiber will pend until an element
- * is put onto the list.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked list.
- *
- * @param lifo LIFO from which to receive.
- *
- * @return Pointer to first element in the list
- */
-extern void *nano_fiber_lifo_get_wait(struct nano_lifo *lifo);
-
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief get the first element from a LIFO, wait with a timeout if empty
- *
- * Remove the first element from the specified system-level linked list lifo;
- * it can only be called from a fiber.
- *
- * If no elements are available, the calling fiber will pend until an element
- * is put onto the list, or the timeout expires, whichever comes first.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked list.
- *
- * @param lifo LIFO on which to operate.
- * @param timeout_in_ticks Time to wait in ticks.
- *
- * @return Pointer to first element in the list, NULL if timed out.
- */
-extern void *nano_fiber_lifo_get_wait_timeout(struct nano_lifo *lifo,
+extern void *nano_fiber_lifo_get(struct nano_lifo *lifo,
 		int32_t timeout_in_ticks);
-
-#endif
 
 /* methods for tasks */
 
@@ -741,54 +684,15 @@ extern void nano_task_lifo_put(struct nano_lifo *lifo, void *data);
  * a pointer to the next element in the linked list.
  *
  * @param lifo LIFO from which to receive.
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
  * @return Pointer to first element in the list if available, otherwise NULL.
  */
-extern void *nano_task_lifo_get(struct nano_lifo *lifo);
-
-/**
- * @brief Get the first element from a LIFO, poll if empty.
- *
- * Remove the first element from the specified nanokernel linked list LIFO; it
- * can only be called from a task.
- *
- * If no elements are available, the calling task will poll until an element is
- * put onto the list.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked list.
- *
- * @param lifo LIFO from which to receive.
- *
- * @sa nano_task_stack_pop_wait()
- *
- * @return Pointer to first element in the list
- */
-extern void *nano_task_lifo_get_wait(struct nano_lifo *lifo);
-
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief get the first element from a lifo, poll if empty.
- *
- * Remove the first element from the specified nanokernel linked list lifo; it
- * can only be called from a task.
- *
- * If no elements are available, the calling task will poll until an element is
- * put onto the list, or the timeout expires, whichever comes first.
- *
- * The first word in the element contains invalid data because that memory
- * location was used to store a pointer to the next element in the linked list.
- *
- * @param lifo LIFO on which to operate
- * @param timeout_in_ticks time to wait in ticks
- *
- * @return Pointer to first element in the list, NULL if timed out.
- */
-extern void *nano_task_lifo_get_wait_timeout(struct nano_lifo *lifo,
+extern void *nano_task_lifo_get(struct nano_lifo *lifo,
 		int32_t timeout_in_ticks);
-
-#endif
 
 /**
  * @}
@@ -801,6 +705,9 @@ extern void *nano_task_lifo_get_wait_timeout(struct nano_lifo *lifo,
 struct nano_sem {
 	struct _nano_queue wait_q;
 	int nsig;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct nano_sem *next;
+#endif
 };
 
 /**
@@ -842,13 +749,18 @@ extern void nano_sem_give(struct nano_sem *sem);
  * is helpful whenever the exact execution context is not known, but should be
  * avoided when the context is known up-front (to avoid unnecessary overhead).
  *
- * It's only valid to call this API from a fiber or a task.
- *
  * @param sem Pointer to a nano_sem structure.
+ * @param timeout_in_ticks Affects the action taken should the LIFO be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necesssary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
- * @return N/A
+ * @warning If it is to be called from the context of an ISR, then @a
+ * timeout_in_ticks must be set to TICKS_NONE.
+ *
+ * @return 1 if semaphore is available, 0 otherwise
  */
-extern void nano_sem_take_wait(struct nano_sem *sem);
+extern int nano_sem_take(struct nano_sem *sem, int32_t timeout_in_ticks);
 
 /* methods for ISRs */
 
@@ -878,10 +790,11 @@ extern void nano_isr_sem_give(struct nano_sem *sem);
  * a wait (pend) operation will NOT be performed.
  *
  * @param sem Pointer to a nano_sem structure.
+ * @param timeout_in_ticks Always use TICKS_NONE.
  *
  * @return 1 if semaphore is available, 0 otherwise
  */
-extern int nano_isr_sem_take(struct nano_sem *sem);
+extern int nano_isr_sem_take(struct nano_sem *sem, int32_t timeout_in_ticks);
 
 /* methods for fibers */
 
@@ -902,54 +815,19 @@ extern void nano_fiber_sem_give(struct nano_sem *sem);
 
 /**
  *
- * @brief Take a nanokernel semaphore, fail if unavailable
+ * @brief Take a nanokernel semaphore, wait or fail if unavailable
  *
  * Attempt to take a nanokernel semaphore; it may be called from a fiber.
  *
- * If the semaphore is not available, this function returns immediately, i.e.
- * a wait (pend) operation will NOT be performed.
- *
  * @param sem Pointer to a nano_sem structure.
+ * @param timeout_in_ticks Affects the action taken should the LIFO be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necesssary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
  * @return 1 if semaphore is available, 0 otherwise
  */
-extern int nano_fiber_sem_take(struct nano_sem *sem);
-
-/**
- *
- * @brief Test a nanokernel semaphore, wait if unavailable
- *
- * Take a nanokernel semaphore; it can only be called from a fiber.
- *
- * If the nanokernel semaphore is not available, i.e. the event counter
- * is 0, the calling fiber will wait (pend) until the semaphore is
- * given (via nano_fiber_sem_give/nano_task_sem_give/nano_isr_sem_give).
- *
- * @param sem Pointer to a nano_sem structure.
- *
- * @return N/A
- */
-extern void nano_fiber_sem_take_wait(struct nano_sem *sem);
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief test a nanokernel semaphore, wait with a timeout if unavailable
- *
- * Take a nanokernel semaphore; it can only be called from a fiber.
- *
- * If the nanokernel semaphore is not available, i.e. the event counter
- * is 0, the calling fiber will wait (pend) until the semaphore is
- * given (via nano_fiber_sem_give/nano_task_sem_give/nano_isr_sem_give). A
- * timeout can be specified.
- *
- * @param sem Pointer to the semaphore to take
- * @param timeout time to wait in ticks
- *
- * @return 1 if semaphore is available, 0 if timed out
- */
-extern int nano_fiber_sem_take_wait_timeout(struct nano_sem *sem,
-		int32_t timeout);
-#endif
+extern int nano_fiber_sem_take(struct nano_sem *sem, int32_t timeout_in_ticks);
 
 /* methods for tasks */
 
@@ -978,46 +856,14 @@ extern void nano_task_sem_give(struct nano_sem *sem);
  * a wait (pend) operation will NOT be performed.
  *
  * @param sem Pointer to a nano_sem structure.
+ * @param timeout_in_ticks Affects the action taken should the LIFO be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necesssary. Otherwise wait up to the specified number of ticks
+ * before timing out.
  *
  * @return 1 if semaphore is available, 0 otherwise
  */
-extern int nano_task_sem_take(struct nano_sem *sem);
-
-/**
- *
- * @brief Take a nanokernel semaphore, poll if unavailable
- *
- * Take a nanokernel semaphore; it can only be called from a task.
- *
- * If the nanokernel semaphore is not available, i.e. the event counter
- * is 0, the calling task will poll until the semaphore is given
- * (via nano_fiber_sem_give/nano_task_sem_give/nano_isr_sem_give).
- *
- * @param sem Pointer to a nano_sem structure.
- *
- * @return N/A
- */
-extern void nano_task_sem_take_wait(struct nano_sem *sem);
-#ifdef CONFIG_NANO_TIMEOUTS
-
-/**
- * @brief test a nanokernel semaphore, poll with a timeout if unavailable
- *
- * Take a nanokernel semaphore; it can only be called from a task.
- *
- * If the nanokernel semaphore is not available, i.e. the event counter is 0,
- * the calling task will poll until the semaphore is given (via
- * nano_fiber_sem_give/nano_task_sem_give/nano_isr_sem_give). A timeout can be
- * specified.
- *
- * @param sem the semaphore to take
- * @param timeout time to wait in ticks
- *
- * @return 1 if semaphore is available, 0 if timed out
- */
-extern int nano_task_sem_take_wait_timeout(struct nano_sem *sem,
-		int32_t timeout);
-#endif
+extern int nano_task_sem_take(struct nano_sem *sem, int32_t timeout_in_ticks);
 
 /**
  * @}
@@ -1044,6 +890,45 @@ struct nano_stack {
  *
  */
 extern void nano_stack_init(struct nano_stack *stack, uint32_t *data);
+
+/**
+ *
+ * @brief Push data onto a stack
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param stack Stack on which to interact
+ * @param data Data to push on stack
+ *
+ * @return N/A
+ *
+ */
+extern void nano_stack_push(struct nano_stack *stack, uint32_t data);
+
+/**
+ *
+ * @brief Pop data from a nanokernel stack
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param stack Stack on which to interact
+ * @param data Container for data to pop
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. No other value is currently supported.
+ *
+ * @return 1 if data was popped from the stack, 0 otherwise
+ *
+ * @warning If called from the context of an ISR, then @a timeout_in_ticks must
+ * be TICKS_NONE.
+ */
+extern int nano_stack_pop(struct nano_stack *stack, uint32_t *data,
+			int32_t timeout_in_ticks);
+
 /* methods for ISRs */
 
 /**
@@ -1075,10 +960,12 @@ extern void nano_isr_stack_push(struct nano_stack *stack, uint32_t data);
  *
  * @param stack Stack on which to interact
  * @param data Container for data to pop
- * @return 1 if stack is not empty, 0 otherwise
+ * @param timeout_in_ticks Must be TICKS_NONE
  *
+ * @return 1 if data was popped from the stack, 0 otherwise
  */
-extern int nano_isr_stack_pop(struct nano_stack *stack, uint32_t *data);
+extern int nano_isr_stack_pop(struct nano_stack *stack, uint32_t *data,
+			int32_t timeout_in_ticks);
 /* methods for fibers */
 
 /**
@@ -1110,29 +997,13 @@ extern void nano_fiber_stack_push(struct nano_stack *stack, uint32_t data);
  *
  * @param stack Stack on which to interact
  * @param data Container for data to pop
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. No other value is currently supported.
  *
- * @return 1 if stack is not empty, 0 otherwise
- *
+ * @return 1 if data was popped from the stack, 0 otherwise
  */
-extern int nano_fiber_stack_pop(struct nano_stack *stack, uint32_t *data);
-
-/**
- *
- * @brief Pop data from a nanokernel stack, wait if empty
- *
- * Pop the first data word from a nanokernel stack object; it can only be
- * called from a fiber.
- *
- * If data is not available the calling fiber will pend until data is pushed
- * onto the stack.
- *
- * @param stack Stack on which to interact
- *
- * @return the data popped from the stack
- *
- */
-extern uint32_t nano_fiber_stack_pop_wait(struct nano_stack *stack);
-
+extern int nano_fiber_stack_pop(struct nano_stack *stack, uint32_t *data, int32_t timeout_in_ticks);
 
 /* methods for tasks */
 
@@ -1164,26 +1035,13 @@ extern void nano_task_stack_push(struct nano_stack *stack, uint32_t data);
  *
  * @param stack Stack on which to interact
  * @param data Container for data to pop
+ * @param timeout_in_ticks Affects the action taken should the fifo be empty.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. No other value is currently supported.
  *
- * @return 1 if stack is not empty, 0 otherwise
+ * @return 1 if data was popped from the stack, 0 otherwise
  */
-extern int nano_task_stack_pop(struct nano_stack *stack, uint32_t *data);
-
-/**
- *
- * @brief Pop data from a nanokernel stack, poll if empty
- *
- * Pop the first data word from a nanokernel stack; it can only be called
- * from a task.
- *
- * If data is not available the calling task will poll until data is pushed
- * onto the stack.
- *
- * @param stack Stack on which to interact
- *
- * @return the data popped from the stack
- */
-extern uint32_t nano_task_stack_pop_wait(struct nano_stack *stack);
+extern int nano_task_stack_pop(struct nano_stack *stack, uint32_t *data, int32_t timeout_in_ticks);
 
 /* thread custom data APIs */
 #ifdef CONFIG_THREAD_CUSTOM_DATA
@@ -1204,6 +1062,9 @@ struct nano_timer {
 	uint32_t ticks;
 	struct nano_lifo lifo;
 	void *userData;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct nano_timer *next;
+#endif
 };
 
 /**
@@ -1222,6 +1083,99 @@ struct nano_timer {
  * @return N/A
  */
 extern void nano_timer_init(struct nano_timer *timer, void *data);
+
+/**
+ *
+ * @brief Start a nanokernel timer
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param timer Timer
+ * @param ticks Number of ticks
+ *
+ * @return N/A
+ *
+ */
+extern void nano_timer_start(struct nano_timer *timer, int ticks);
+
+/**
+ * @brief Wait for a nanokernel timer to expire
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param timer Timer
+ * @param timeout_in_ticks Affects the action taken if the timer has not
+ * expired. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. No other value is currently supported.
+ *
+ * @return N/A
+ *
+ * @warning If called from an ISR, then @a timeout_in_ticks must be TICKS_NONE.
+ */
+static inline void *nano_timer_test(struct nano_timer *timer, int32_t timeout_in_ticks)
+{
+	return nano_lifo_get(&timer->lifo, timeout_in_ticks);
+}
+
+/**
+ * @brief Stop a nanokernel timer
+ *
+ * This is a convenience wrapper for the execution context-specific APIs. This
+ * is helpful whenever the exact execution context is not known, but should be
+ * avoided when the context is known up-front (to avoid unnecessary overhead).
+ *
+ * @param timer Timer to stop
+ *
+ * @return pointer to timer initialization data
+ */
+extern void nano_timer_stop(struct nano_timer *timer);
+
+/* methods for ISRs */
+
+/**
+ *
+ * @brief Start a nanokernel timer from an ISR
+ *
+ * This function starts a previously initialized nanokernel timer object.
+ * The timer will expire in @a ticks system clock ticks.
+ *
+ * @param timer Timer
+ * @param ticks Number of ticks
+ *
+ * @return N/A
+ */
+extern void nano_isr_timer_start(struct nano_timer *timer, int ticks);
+
+/**
+ * @brief Make the current ISR check for a timer expiry
+ *
+ * This function checks if a previously started nanokernel timer object has
+ * expired.
+ *
+ * @param timer Timer to check
+ * @param timeout_in_ticks Always use TICKS_NONE
+ *
+ * @return pointer to timer initialization data, or NULL if timer not expired
+ */
+static inline void *nano_isr_timer_test(struct nano_timer *timer, int32_t timeout_in_ticks)
+{
+	return nano_isr_lifo_get(&timer->lifo, timeout_in_ticks);
+}
+
+/**
+ * @brief Stop a nanokernel timer from an ISR
+ *
+ * This function stops a previously started nanokernel timer object.
+ *
+ * @param timer Timer to stop
+ *
+ * @return N/A
+ */
+extern void nano_isr_timer_stop(struct nano_timer *timer);
 
 /* methods for fibers */
 
@@ -1242,31 +1196,20 @@ extern void nano_fiber_timer_start(struct nano_timer *timer, int ticks);
 /**
  * @brief Make the current fiber check for a timer expiry
  *
- * This function will check if a timer has expired. The timer must
- * have been initialized by nano_timer_init() and started via either
- * nano_fiber_timer_start() or nano_task_timer_start() first.
+ * This function tests if a previously started nanokernel timer object has
+ * expired, or waits until it does.
  *
  * @param timer Timer to check
+ * @param timeout_in_ticks Affects the action taken if the timer has not
+ * expired. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. No other value is currently supported.
  *
  * @return pointer to timer initialization data, or NULL if timer not expired
  */
-extern void *nano_fiber_timer_test(struct nano_timer *timer);
-
-/**
- *
- * @brief Make the current fiber wait for a timer to expire
- *
- * This function will pend on a timer if it hasn't expired yet. The timer must
- * have been initialized by nano_timer_init() and started via either
- * nano_fiber_timer_start() or nano_task_timer_start() first and must not
- * have been stopped via nano_task_timer_stop() or nano_fiber_timer_stop().
- *
- * @param timer Timer to pend on
- *
- * @return pointer to timer initialization data
- *
- */
-extern void *nano_fiber_timer_wait(struct nano_timer *timer);
+static inline void *nano_fiber_timer_test(struct nano_timer *timer, int32_t timeout_in_ticks)
+{
+	return nano_fiber_lifo_get(&timer->lifo, timeout_in_ticks);
+}
 
 /**
  * @brief Stop a nanokernel timer from a fiber
@@ -1297,31 +1240,20 @@ extern void nano_task_timer_start(struct nano_timer *timer, int ticks);
 /**
  * @brief Make the current task check for a timer expiry
  *
- * This function will check if a timer has expired. The timer must
- * have been initialized by nano_timer_init() and started via either
- * nano_fiber_timer_start() or nano_task_timer_start() first.
+ * This function tests if a previously started nanokernel timer object has
+ * expired, or waits until it does.
  *
  * @param timer Timer to check
+ * @param timeout_in_ticks Affects the action taken if the timer has not
+ * expired. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. No other value is currently supported.
  *
  * @return pointer to timer initialization data, or NULL if timer not expired
  */
-extern void *nano_task_timer_test(struct nano_timer *timer);
-
-/**
- *
- * @brief Make the current task wait for a timer to expire
- *
- * This function will pend on a timer if it hasn't expired yet. The timer must
- * have been initialized by nano_timer_init() and started via either
- * nano_fiber_timer_start() or nano_task_timer_start() first and must not
- * have been stopped via nano_task_timer_stop() or nano_fiber_timer_stop().
- *
- * @param timer Timer to pend on
- *
- * @return pointer to timer initialization data
- *
- */
-extern void *nano_task_timer_wait(struct nano_timer *timer);
+static inline void *nano_task_timer_test(struct nano_timer *timer, int32_t timeout_in_ticks)
+{
+	return nano_task_lifo_get(&timer->lifo, timeout_in_ticks);
+}
 
 /**
  * @brief Stop a nanokernel timer from a task
@@ -1343,7 +1275,7 @@ extern void nano_task_timer_stop(struct nano_timer *timer);
  * @return the current system tick count
  *
  */
-extern int64_t nano_tick_get(void);
+extern int64_t sys_tick_get(void);
 
 /**
  *
@@ -1352,14 +1284,20 @@ extern int64_t nano_tick_get(void);
  * @return the current system tick count
  *
  */
-extern uint32_t nano_tick_get_32(void);
+extern uint32_t sys_tick_get_32(void);
 
 /**
  * @brief Return a high resolution time stamp
  *
- * @return the current timer hardware count
+ * This routine reads the counter register on the processor's high precision
+ * timer device. This counter register increments at a relatively high rate
+ * (e.g. 20 MHz), and is thus considered a "high resolution" timer. This is
+ * in contrast to sys_tick_get_32() which returns the value of the system
+ * ticks variable.
+ *
+ * @return the current high precision clock value
  */
-extern uint32_t nano_cycle_get_32(void);
+extern uint32_t sys_cycle_get_32(void);
 
 /**
  *
@@ -1369,7 +1307,7 @@ extern uint32_t nano_cycle_get_32(void);
  *
  * @return tick count since reference time; undefined for first invocation
  */
-extern int64_t nano_tick_delta(int64_t *reftime);
+extern int64_t sys_tick_delta(int64_t *reftime);
 
 /**
  *
@@ -1379,8 +1317,42 @@ extern int64_t nano_tick_delta(int64_t *reftime);
  *
  * @return 32-bit tick count since reference time; undefined for first invocation
  */
-extern uint32_t nano_tick_delta_32(int64_t *reftime);
+extern uint32_t sys_tick_delta_32(int64_t *reftime);
 
+
+/*
+ * Lists for object tracing
+ */
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+
+struct nano_sem *_track_list_nano_sem;
+
+struct nano_fifo *_track_list_nano_fifo;
+
+struct nano_lifo *_track_list_nano_lifo;
+
+struct nano_timer *_track_list_nano_timer;
+
+#define DEBUG_TRACING_OBJ_INIT(type, obj, list) { \
+	obj->next = NULL; \
+	if (list == NULL) { \
+		list = obj; \
+	} \
+	else { \
+		if (list != obj) { \
+			type link = list; \
+			while ((link->next != NULL) && (link->next != obj)) { \
+				link = link->next; \
+			} \
+			if (link->next == NULL) { \
+				link->next = obj; \
+			} \
+		} \
+	} \
+}
+#else
+#define DEBUG_TRACING_OBJ_INIT(type, obj, list) do { } while ((0))
+#endif
 
 /**
  * @}
@@ -1388,6 +1360,35 @@ extern uint32_t nano_tick_delta_32(int64_t *reftime);
  */
 
 #ifdef __cplusplus
+}
+#endif
+
+#if defined(CONFIG_CPLUSPLUS) && defined(__cplusplus)
+/*
+ * Define new and delete operators.
+ * At this moment they do nothing since objects are supposed
+ * to be statically allocated
+ */
+inline void operator delete(void *ptr)
+{
+	(void)ptr;
+}
+
+inline void operator delete[](void *ptr)
+{
+	(void)ptr;
+}
+
+inline void *operator new(size_t size)
+{
+	(void)size;
+	return NULL;
+}
+
+inline void *operator new[](size_t size)
+{
+	(void)size;
+	return NULL;
 }
 #endif
 

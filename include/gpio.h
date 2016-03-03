@@ -18,7 +18,12 @@
 
 #ifndef __GPIO_H__
 #define __GPIO_H__
-
+/**
+ * @brief GPIO Interface
+ * @defgroup gpio_interface GPIO Interface
+ * @ingroup io_interfaces
+ * @{
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -57,6 +62,14 @@ extern "C" {
 #define GPIO_PUD_PULL_UP	(1 << GPIO_PUD_POS)
 #define GPIO_PUD_PULL_DOWN	(2 << GPIO_PUD_POS)
 #define GPIO_PUD_MASK		(3 << GPIO_PUD_POS)
+
+/* Pin enable/disable
+ *
+ * Individual pins can be enabled or disabled
+ * if the controller supports this operation.
+ */
+#define GPIO_PIN_ENABLE		(1 << 10)
+#define GPIO_PIN_DISABLE	(1 << 11)
 
 /* application callback function signature*/
 typedef void (*gpio_callback_t)(struct device *port, uint32_t pin);
@@ -272,5 +285,9 @@ static inline int gpio_resume(struct device *port)
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @}
+ */
 
 #endif /* __GPIO_H__ */

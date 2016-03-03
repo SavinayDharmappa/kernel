@@ -15,13 +15,15 @@
  */
 
 /*
-DESCRIPTION
-Platform independent, commonly used macros and defines related to linker script.
-
-This file may be included by:
-- Linker script files: for linker section declarations
-- C files: for external declaration of address or size of linker section
-- Assembly files: for external declaration of address or size of linker section
+ * DESCRIPTION
+ * Platform independent, commonly used macros and defines related to linker
+ * script.
+ *
+ * This file may be included by:
+ * - Linker script files: for linker section declarations
+ * - C files: for external declaration of address or size of linker section
+ * - Assembly files: for external declaration of address or size of linker
+ *   section
  */
 
 #ifndef _LINKERDEFS_H
@@ -31,7 +33,7 @@ This file may be included by:
 #include <sections.h>
 
 /* include platform dependent linker-defs */
-#ifdef CONFIG_X86_32
+#ifdef CONFIG_X86
 #include <arch/x86/linker-defs-arch.h>
 #elif defined(CONFIG_ARM)
 /* Nothing yet to include */
@@ -42,7 +44,39 @@ This file may be included by:
 #endif
 
 #ifdef _LINKER
-#ifdef CONFIG_X86_32 /* LINKER FILES: defines used by linker script */
+
+/*
+ * generate a symbol to mark the start of the device initialization objects for
+ * the specified level, then link all of those objects (sorted by priority);
+ * ensure the objects aren't discarded if there is no direct reference to them
+ */
+
+#define DEVICE_INIT_LEVEL(level)				\
+		__device_##level##_start = .;			\
+		KEEP(*(SORT(.init_##level[0-9])));		\
+		KEEP(*(SORT(.init_##level[1-9][0-9])));	\
+
+/*
+ * link in device initialization objects for all devices that are automatically
+ * initialized by the kernel; the objects are sorted in the order they will be
+ * initialized (i.e. ordered by level, sorted by priority within a level)
+ */
+
+#define	DEVICE_INIT_SECTIONS()			\
+		__device_init_start = .;		\
+		DEVICE_INIT_LEVEL(PRIMARY)		\
+		DEVICE_INIT_LEVEL(SECONDARY)	\
+		DEVICE_INIT_LEVEL(NANOKERNEL)	\
+		DEVICE_INIT_LEVEL(MICROKERNEL)	\
+		DEVICE_INIT_LEVEL(APPLICATION)	\
+		__device_init_end = .;			\
+
+
+/* define a section for undefined device initialization levels */
+#define DEVICE_INIT_UNDEFINED_SECTION()		\
+		KEEP(*(SORT(.init_[_A-Z0-9]*)))	\
+
+#ifdef CONFIG_X86 /* LINKER FILES: defines used by linker script */
 /* Should be moved to linker-common-defs.h */
 #if defined(CONFIG_XIP)
 #define ROMABLE_REGION ROM
@@ -63,6 +97,7 @@ This file may be included by:
 #endif
 
 #elif defined(_ASMLANGUAGE)
+
 /* Assembly FILES: declaration defined by the linker script */
 GDATA(__bss_start)
 GDATA(__bss_num_words)
@@ -72,7 +107,7 @@ GDATA(__data_ram_start)
 GDATA(__data_num_words)
 #endif
 
-#else
+#else /* ! _ASMLANGUAGE */
 
 #include <stdint.h>
 extern char __bss_start[];
@@ -83,7 +118,6 @@ extern char __data_ram_start[];
 extern int __data_num_words[];
 #endif
 
-/* for software sys_mem_probe() */
 extern char _image_rom_start[];
 extern char _image_rom_end[];
 extern char _image_ram_start[];

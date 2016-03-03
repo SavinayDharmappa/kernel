@@ -1,5 +1,3 @@
-/* Freescale K20 microprocessor Watch Dog registers */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module defines Watch Dog Registers for the K20 Family of microprocessors
+/**
+ * @file
+ * @brief Freescale K20 microprocessor Watch Dog registers
+ *
+ * This module defines Watch Dog Registers for the K20 Family of microprocessors
  */
 
 #ifndef _K20WDOG_H_
@@ -26,13 +26,17 @@ This module defines Watch Dog Registers for the K20 Family of microprocessors
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Sequence of writes within 20 bus cycles for action to take effect */
 #define WDOG_REFRESH_1 0xA602
 #define WDOG_REFRESH_2 0xB480
 #define WDOG_UNLOCK_1 0xC520
 #define WDOG_UNLOCK_2 0xD928
 
-typedef union {
+union WDOG_STCTRLH {
 	uint16_t value; /* reset= 0x01D3 */
 	struct {
 		uint8_t wdogen : 1 __packed;
@@ -50,12 +54,12 @@ typedef union {
 		uint8_t disestwdog : 1 __packed;
 		uint8_t res_15 : 1 __packed;
 	} field;
-} WDOG_STCTRLH_t;
+};
 
 /* K20 Microntroller WDOG module register structure */
 
-typedef volatile struct {
-	WDOG_STCTRLH_t stctrlh; /* 0x00 */
+struct K20_WDOG {
+	union WDOG_STCTRLH stctrlh; /* 0x00 */
 	uint16_t stctrll;       /* 0x02 */
 	uint16_t tovalh;	/* 0x04 */
 	uint16_t tovall;	/* 0x06 */
@@ -67,7 +71,7 @@ typedef volatile struct {
 	uint16_t tmroutl;       /* 0x12 */
 	uint16_t rstcnt;	/* 0x14 */
 	uint16_t presc;		/* 0x16 */
-} K20_WDOG_t;
+};
 
 /**/
 /**< Macro to enable all interrupts. */
@@ -87,7 +91,7 @@ typedef volatile struct {
  *
  * @return N/A
  */
-static ALWAYS_INLINE void wdog_unlock(K20_WDOG_t *wdog_p)
+static ALWAYS_INLINE void wdog_unlock(volatile struct K20_WDOG *wdog_p)
 {
 	/*
 	 * NOTE: DO NOT SINGLE STEP THROUGH THIS FUNCTION!!!
@@ -118,9 +122,9 @@ static ALWAYS_INLINE void wdog_unlock(K20_WDOG_t *wdog_p)
  *
  * @return N/A
  */
-static ALWAYS_INLINE void wdog_disable(K20_WDOG_t *wdog_p)
+static ALWAYS_INLINE void wdog_disable(volatile struct K20_WDOG *wdog_p)
 {
-	WDOG_STCTRLH_t stctrlh;
+	union WDOG_STCTRLH_t stctrlh;
 
 	/* First unlock the watchdog so that we can write to registers */
 	wdog_unlock(wdog_p);
@@ -134,5 +138,9 @@ static ALWAYS_INLINE void wdog_disable(K20_WDOG_t *wdog_p)
 	stctrlh.field.wdogen = 0;
 	wdog_p->stctrlh.value = stctrlh.value;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _K20WDOG_H_ */

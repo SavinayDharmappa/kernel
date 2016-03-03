@@ -1,5 +1,3 @@
-/* sysFatalErrorHandler - ARM Cortex-M system fatal error handler */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module provides the _SysFatalErrorHandler() routine for Cortex-M platforms.
+/**
+ * @file
+ * @brief ARM Cortex-M system fatal error handler
+ *
+ * This module provides the _SysFatalErrorHandler() routine for Cortex-M
+ * platforms.
  */
 
 #include <nanokernel.h>
@@ -61,15 +62,12 @@ static inline void nonEssentialTaskAbort(void)
  * implementation to take other actions, such as logging error (or debug)
  * information to a persistent repository and/or rebooting the system.
  *
- * @return N/A
+ * @param reason fatal error reason
+ * @param pEsf pointer to exception stack frame
  *
- * \NOMANUAL
+ * @return N/A
  */
-
-void _SysFatalErrorHandler(
-	unsigned int reason, /* fatal error reason */
-	const NANO_ESF * pEsf /* pointer to exception stack frame */
-	)
+void _SysFatalErrorHandler(unsigned int reason, const NANO_ESF * pEsf)
 {
 	nano_context_type_t curCtx = sys_execution_context_type_get();
 

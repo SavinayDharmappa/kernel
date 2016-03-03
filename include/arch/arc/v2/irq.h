@@ -1,5 +1,3 @@
-/* arc/v2/irq.h - ARCv2 public interrupt handling */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,8 +14,10 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief ARCv2 public interrupt handling
+ *
  * ARCv2 nanokernel interrupt handling interface. Included by ARC/v2/arch.h.
  */
 
@@ -27,16 +27,21 @@
 #include <arch/arc/v2/aux_regs.h>
 #include <toolchain/common.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _ASMLANGUAGE
 GTEXT(_irq_exit);
 GTEXT(irq_connect)
 GTEXT(irq_enable)
 GTEXT(irq_disable)
 #else
-extern int irq_connect(unsigned int irq,
+extern int irq_connect_dynamic(unsigned int irq,
 			     unsigned int prio,
 			     void (*isr)(void *arg),
-			     void *arg);
+			     void *arg,
+			     uint32_t flags);
 
 extern void irq_enable(unsigned int irq);
 extern void irq_disable(unsigned int irq);
@@ -87,7 +92,7 @@ static ALWAYS_INLINE unsigned int irq_lock(void)
  *
  * @brief Enable all interrupts on the local CPU
  *
- * This routine re-enables interrupts on the local CPU.  The <key> parameter
+ * This routine re-enables interrupts on the local CPU.  The @a key parameter
  * is an architecture-dependent lock-out key that is returned by a previous
  * invocation of irq_lock().
  *
@@ -102,4 +107,9 @@ static ALWAYS_INLINE void irq_unlock(unsigned int key)
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ARCH_ARC_V2_IRQ__H_ */

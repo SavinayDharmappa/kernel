@@ -19,7 +19,8 @@
  */
 
 /* can only be used with non-XIP kernels, since they don't have their vector
- * table in the FLASH */
+ * table in the FLASH
+ */
 #if !defined(CONFIG_XIP)
 
 #include <nanokernel.h>
@@ -77,17 +78,6 @@ void sys_exc_esf_dump(NANO_ESF *esf)
 	printk("r14/lr: %x\n", esf->lr);
 	printk("r15/pc: %x  ", esf->pc);
 	printk("xpsr:   %x\n", esf->xpsr);
-#if CONFIG_ARM_DEBUG_ESF
-	printk("r4/v1:  %x  ", esf->v1);
-	printk("r5/v2:  %x  ", esf->v2);
-	printk("r6/v3:  %x\n", esf->v3);
-	printk("r7/v4:  %x  ", esf->v4);
-	printk("r8/v5:  %x  ", esf->v5);
-	printk("r9/v6:  %x\n", esf->v6);
-	printk("r10/v7: %x  ", esf->v7);
-	printk("r11/v8: %x  ", esf->v8);
-	printk("r13/sp: %x\n", esf->sp);
-#endif
 }
 
 #endif /* CONFIG_XIP */

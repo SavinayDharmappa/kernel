@@ -33,34 +33,12 @@
 extern "C" {
 #endif
 
-
-
 #include  <microkernel/base_api.h>
 
-/**
- * @cond internal
- */
-/**
- * @brief This routine is the entry to the mutex lock kernel service.
- *
- * @param mutex Mutex object
- * @param time Timeout value (in ticks)
- *
- * @return RC_OK on success, RC_FAIL on error, RC_TIME on timeout
- */
-extern int _task_mutex_lock(kmutex_t mutex, int32_t time);
-
-/**
- * @brief This routine is the entry to the mutex unlock kernel service.
- *
- * @param mutex Mutex
- *
- * @return N/A
- */
 extern void _task_mutex_unlock(kmutex_t mutex);
 
-/**
- * @brief Initializer for mutexes
+/*
+ * Initializer for mutexes
  */
 #define __MUTEX_DEFAULT \
 	{ \
@@ -74,66 +52,47 @@ extern void _task_mutex_unlock(kmutex_t mutex);
 	}
 
 /**
- * @endcond
+ * @brief Lock mutex
+ *
+ * This routine locks mutex @a mutex. If the mutex is currently locked by
+ * another task the routine either waits until it becomes available, or until
+ * the specified time limit is reached.
+ *
+ * A task is permitted to lock a mutex it has already locked; in such a case
+ * this routine immediately succeeds.
+ *
+ * @param mutex Mutex name.
+ * @param timeout Affects the action taken should the mutex already be locked.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks before
+ * timing out.
+ *
+ * @retval RC_OK Successfully locked mutex
+ * @retval RC_TIME Timed out while waiting for mutex
+ * @retval RC_FAIL Failed to immediately lock mutex when
+ * @a timeout = TICKS_NONE
  */
+extern int task_mutex_lock(kmutex_t mutex, int32_t timeout);
 
 /**
- * @brief Try to lock mutex.
+ * @brief Unlock mutex.
  *
- * This tries to lock mutex. If the mutex cannot be locked
- * immediately, it returns RC_FAIL.
+ * This routine unlocks mutex @a m. The mutex must currently be locked by the
+ * requesting task.
  *
- * @param m Mutex
+ * The mutex cannot be claimed by another task until it has been unlocked by
+ * the requesting task as many times as it was locked by that task.
  *
- * @return RC_OK on success, RC_FAIL on error
- */
-#define task_mutex_lock(m) _task_mutex_lock(m, TICKS_NONE)
-
-/**
- * @brief Wait indefinitely to lock mutex.
- *
- * This waits indefinitely until the mutex can be locked. This is
- * a blocking call.
- *
- * @param m Mutex
- *
- * @return RC_OK on success, RC_FAIL on error
- */
-#define task_mutex_lock_wait(m) _task_mutex_lock(m, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-
-/**
- * @brief Try to lock mutex with timeout.
- *
- * If the mutex cannot be locked immediately, this will keep trying
- * to lock mutex until certain time specified in t has passed.
- * The timeout value is in ticks.
- *
- * @param m Mutex object
- * @param t Timeout value (in ticks)
- *
- * @return RC_OK on success, RC_FAIL on error, RC_TIME on timeout
- */
-#define task_mutex_lock_wait_timeout(m, t) _task_mutex_lock(m, t)
-#endif
-
-/**
- * @brief Unlock mutex
- *
- * @param m Mutex
+ * @param m Mutex name.
  *
  * @return N/A
  */
 #define task_mutex_unlock(m) _task_mutex_unlock(m)
 
 /**
- * @brief Define a private mutex
+ * @brief Define a private mutex.
  *
- * This declares and initializes a private mutex. The new mutex can be
- * passed to the microkernel mutex functions.
- *
- * @param name Name of the mutex
+ * @param name Mutex name.
  */
 #define DEFINE_MUTEX(name) \
 	struct _k_mutex_struct _k_mutex_obj_##name = __MUTEX_DEFAULT; \

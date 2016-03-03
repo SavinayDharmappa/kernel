@@ -48,7 +48,6 @@ struct k_timer {
 #define _K_SVC_MOVEDATA_REQ				_k_movedata_request
 #define _K_SVC_NOP					_k_nop
 #define _K_SVC_OFFLOAD_TO_FIBER				_k_offload_to_fiber
-#define _K_SVC_TIME_ELAPSE				_k_time_elapse
 #define _K_SVC_WORKLOAD_GET				_k_workload_get
 
 #define _K_SVC_EVENT_HANDLER_SET			_k_event_handler_set
@@ -137,6 +136,7 @@ struct k_mrec {
 	uint32_t time;
 	uint32_t data1;
 	uint32_t data2;
+	void     *ptr;
 };
 
 typedef enum {
@@ -185,8 +185,7 @@ struct _pipe_req_arg {
 
 struct _pipe_xfer_req_arg {
 	struct req_info req_info;
-	void *data_ptr; /* if NULL, data is embedded in
-			     cmd packet		    */
+	void *data_ptr; /* if NULL, data is embedded in cmd packet */
 	int total_size;      /* total size of data/free space    */
 	int xferred_size;    /* size of data ALREADY Xferred	    */
 	PIPE_REQUEST_STATUS status; /* status of processing of request  */
@@ -206,11 +205,14 @@ struct _pipe_xfer_ack_arg {
 	struct _k_pipe_struct *pipe_ptr;
 	XFER_TYPE xfer_type; /* W2B, B2R or W2R		    */
 	struct k_args *writer_ptr;    /* if there's a writer involved,
-				 this is the link to it      */
+				       * this is the link to it
+				       */
 	struct k_args *reader_ptr; /* if there's a reader involved,
-				 this is the link to it      */
-	int id; /* if it is a Xfer to/from a buffer,
-		   this is the registered Xfer's ID */
+				    * this is the link to it
+				    */
+	int id; /* if it is a Xfer to/from a buffer, this is the registered
+		 * Xfer's ID
+		 */
 	int size; /* amount of data Xferred	    */
 };
 
@@ -353,12 +355,14 @@ union k_args_args {
 };
 
 /*
- * The size of the k_args structure must be equivalent to ...
- *     CMD_PKT_SIZE_IN_WORDS * sizeof(uint32_t)
- * To this end the entire structure is packed.  This ensures that the compiler
- * aligns 'args' to a 4-byte boundary.  If left unpacked, then some compilers
- * may provide an extra 4 bytes of padding to align it to an 8-byte boundary,
- * thereby violating the previously stated equivalence.
+ * A command packet must be aligned on a 4-byte boundary, since this is what
+ * the microkernel server's command stack processing requires.
+ *
+ * The command packet's size must = CMD_PKT_SIZE_IN_WORDS * sizeof(uint32_t).
+ * Consequently, the structure is packed to prevent some compilers from
+ * introducing unwanted padding between fields; however, this then requires
+ * that some fields be explicitly 4-byte aligned to ensure the overall
+ * size of the structure is correct.
  */
 struct k_args {
 	struct k_args *next;
@@ -380,7 +384,7 @@ struct k_args {
 		int rcode;
 	} Time;
 	K_ARGS_ARGS args;
-} __packed;
+} __aligned(4) __packed;
 
 /* ---------------------------------------------------------------------- */
 /* KERNEL OBJECT STRUCTURES */
@@ -410,14 +414,14 @@ struct pool_struct {
 	struct pool_block *frag_tab;
 
 	char *bufblock;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct pool_struct *next;
+#endif
 };
 
-struct evstr {
-	int status;
-	kevent_handler_t func;
-	struct k_args *waiter;
-	int count;
-};
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+struct pool_struct *_track_list_micro_mem_pool;
+#endif
 
 #ifdef __cplusplus
 }

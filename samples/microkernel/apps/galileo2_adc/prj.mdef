@@ -1,0 +1,5 @@
+% Application       : ADC and LCD demo
+
+% TASK NAME  PRIO ENTRY STACK GROUPS
+% ==================================
+  TASK TASKA    7 adc_task  2048 [EXE]

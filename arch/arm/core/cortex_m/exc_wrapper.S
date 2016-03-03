@@ -32,7 +32,17 @@ SECTION_FUNC(TEXT, _exc_wrapper)
 
 	_GDB_STUB_EXC_ENTRY
 
-	_asm_get_esf ip r0
+	ldr ip, =_SCS_ICSR
+	ldr ip, [ip]
+	ands.w ip, #_SCS_ICSR_RETTOBASE
+
+	itte eq			/* is the RETTOBASE bit zero ? */
+	mrseq r0, MSP	/* if so, we're not returning to thread mode, thus this
+					 * is a nested exception: the stack frame is on the MSP */
+	addeq.w r0, #4	/* ESF returned here is off by 4 because of the push {r2}
+					 * in_GDB_STUB_EXC_ENTRY */
+	mrsne r0, PSP	/* if not, we are returning to thread mode, thus this is
+					 * not a nested exception: the stack frame is on the PSP */
 
 	/* r0 now contains the pointer to the full ESF */
 

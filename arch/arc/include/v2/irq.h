@@ -1,5 +1,3 @@
-/* irq.h - interrupt helper functions (ARC) */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,14 +14,20 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief Interrupt helper functions (ARC)
+ *
  * This file contains private nanokernel structures definitions and various
  * other definitions for the ARCv2 processor architecture.
  */
 
 #ifndef _ARCV2_IRQ__H_
 #define _ARCV2_IRQ__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define _ARC_V2_AUX_IRQ_CTRL_BLINK (1 << 9)
 #define _ARC_V2_AUX_IRQ_CTRL_LOOP_REGS (1 << 10)
@@ -60,4 +64,9 @@ static ALWAYS_INLINE void _irq_setup(void)
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ARCV2_IRQ__H_ */

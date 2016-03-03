@@ -1,5 +1,3 @@
-/* irq_init.c - ARM Cortex-M interrupt initialization */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,14 +14,16 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-The ARM Cortex-M architecture provides its own fiber_abort() to deal with
-different CPU modes (handler vs thread) when a fiber aborts. When its entry
-point returns or when it aborts itself, the CPU is in thread mode and must
-call _Swap() (which triggers a service call), but when in handler mode, the
-CPU must exit handler mode to cause the context switch, and thus must queue
-the PendSV exception.
+/**
+ * @file
+ * @brief ARM Cortex-M interrupt initialization
+ *
+ * The ARM Cortex-M architecture provides its own fiber_abort() to deal with
+ * different CPU modes (handler vs thread) when a fiber aborts. When its entry
+ * point returns or when it aborts itself, the CPU is in thread mode and must
+ * call _Swap() (which triggers a service call), but when in handler mode, the
+ * CPU must exit handler mode to cause the context switch, and thus must queue
+ * the PendSV exception.
  */
 
 #include <toolchain.h>

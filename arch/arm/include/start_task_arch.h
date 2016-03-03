@@ -1,5 +1,3 @@
-/* start_task.h - ARM nanokernel declarations to start a task */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-ARM-specific parts of start_task().
-
-Currently empty, only here for abstraction.
+/**
+ * @file
+ * @brief ARM nanokernel declarations to start a task
+ *
+ * ARM-specific parts of start_task().
+ *
+ * Currently empty, only here for abstraction.
  */
 
 #ifndef _START_TASK_ARCH__H_
@@ -33,8 +33,16 @@ Currently empty, only here for abstraction.
 #include <nano_private.h>
 #include <microkernel/task.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define _START_TASK_ARCH(task, opt_ptr) \
 	do {/* nothing */              \
 	} while ((0))
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _START_TASK_ARCH__H_ */

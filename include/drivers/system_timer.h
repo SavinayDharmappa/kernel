@@ -1,5 +1,3 @@
-/* system_timer.h - timer driver API */
-
 /*
  * Copyright (c) 2015 Wind River Systems, Inc.
  *
@@ -16,14 +14,20 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Declare API implemented by system timer driver and used by kernel components.
+/**
+ * @file
+ * @brief Timer driver API
+ *
+ *
+ * Declare API implemented by system timer driver and used by kernel components.
  */
 
 #ifndef _TIMER__H_
 #define _TIMER__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 
@@ -33,7 +37,6 @@ GTEXT(_timer_int_handler)
 
 #include <device.h>
 
-extern uint32_t _sys_clock_cycle_get(void);
 extern int _sys_clock_driver_init(struct device *device);
 /*
  * Timer interrupt handler is one of the routines that the driver
@@ -54,21 +57,21 @@ extern void _timer_idle_exit(void);
 
 extern uint32_t _nano_get_earliest_deadline(void);
 
-#if defined(CONFIG_NANO_TIMEOUTS) || defined(CONFIG_NANO_TIMERS)
-	extern void _nano_sys_clock_tick_announce(uint32_t ticks);
-#else
-	#define _nano_sys_clock_tick_announce(ticks) do { } while((0))
-#endif
+extern void _nano_sys_clock_tick_announce(int32_t ticks);
 
 #ifdef CONFIG_MICROKERNEL
 	#define _sys_clock_tick_announce() \
-		nano_isr_stack_push(&_k_command_stack, TICK_EVENT)
+		isr_event_send(TICK_EVENT)
 #else
-	extern uint32_t _sys_idle_elapsed_ticks;
+	extern int32_t _sys_idle_elapsed_ticks;
 	#define _sys_clock_tick_announce() \
 		_nano_sys_clock_tick_announce(_sys_idle_elapsed_ticks)
 #endif
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _TIMER__H_ */

@@ -1,5 +1,3 @@
-/* fault.c - common fault handler for ARM Cortex-M */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Common fault handler for ARM Cortex-M processors.
+/**
+ * @file
+ * @brief Common fault handler for ARM Cortex-M
+ *
+ * Common fault handler for ARM Cortex-M processors.
  */
 
 #include <toolchain.h>
@@ -60,10 +60,7 @@ Common fault handler for ARM Cortex-M processors.
  * BFAR: 0xff001234
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 void _FaultDump(const NANO_ESF *esf, int fault)
 {
 	int escalation = 0;
@@ -111,10 +108,7 @@ void _FaultDump(const NANO_ESF *esf, int fault)
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void _FaultThreadShow(const NANO_ESF *esf)
 {
 	PR_EXC("  Executing thread ID (thread): 0x%x\n"
@@ -130,12 +124,8 @@ static void _FaultThreadShow(const NANO_ESF *esf)
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
-static void _MpuFault(const NANO_ESF *esf,
-					    int fromHardFault)
+static void _MpuFault(const NANO_ESF *esf, int fromHardFault)
 {
 	PR_EXC("***** MPU FAULT *****\n");
 
@@ -165,12 +155,8 @@ static void _MpuFault(const NANO_ESF *esf,
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
-static void _BusFault(const NANO_ESF *esf,
-					    int fromHardFault)
+static void _BusFault(const NANO_ESF *esf, int fromHardFault)
 {
 	PR_EXC("***** BUS FAULT *****\n");
 
@@ -206,10 +192,7 @@ static void _BusFault(const NANO_ESF *esf,
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void _UsageFault(const NANO_ESF *esf)
 {
 	PR_EXC("***** USAGE FAULT *****\n");
@@ -246,10 +229,7 @@ static void _UsageFault(const NANO_ESF *esf)
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void _HardFault(const NANO_ESF *esf)
 {
 	PR_EXC("***** HARD FAULT *****\n");
@@ -274,10 +254,7 @@ static void _HardFault(const NANO_ESF *esf)
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void _DebugMonitor(const NANO_ESF *esf)
 {
 	PR_EXC("***** Debug monitor exception (not implemented) *****\n");
@@ -290,12 +267,8 @@ static void _DebugMonitor(const NANO_ESF *esf)
  * See _FaultDump() for example.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
-static void _ReservedException(const NANO_ESF *esf,
-						     int fault)
+static void _ReservedException(const NANO_ESF *esf, int fault)
 {
 	PR_EXC("***** %s %d) *****\n",
 	       fault < 16 ? "Reserved Exception (" : "Spurious interrupt (IRQ ",
@@ -320,10 +293,7 @@ static void _ReservedException(const NANO_ESF *esf,
  *   Address: 0xff001234
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void _FaultDump(const NANO_ESF *esf, int fault)
 {
 	switch (fault) {
@@ -366,10 +336,7 @@ static void _FaultDump(const NANO_ESF *esf, int fault)
  *            state the exception was taken.
  *
  * @return This function does not return.
- *
- * \NOMANUAL
  */
-
 void _Fault(const NANO_ESF *esf)
 {
 	int fault = _ScbActiveVectorGet();
@@ -386,10 +353,7 @@ void _Fault(const NANO_ESF *esf)
  * Turns on the desired hardware faults.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 void _FaultInit(void)
 {
 	_ScbDivByZeroFaultEnable();

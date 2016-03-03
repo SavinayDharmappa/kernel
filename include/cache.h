@@ -19,6 +19,10 @@
 
 #include <nanokernel.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define _sys_cache_flush_sig(x) void (x)(vaddr_t virt, size_t size)
 
 #if defined(CONFIG_CACHE_FLUSHING)
@@ -57,6 +61,10 @@ static inline _sys_cache_flush_sig(sys_cache_flush)
 	#define sys_cache_line_size CONFIG_CACHE_LINE_SIZE
 #else
 	#define sys_cache_line_size 0
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* _cache__h_ */

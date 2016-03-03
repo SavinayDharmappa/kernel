@@ -24,9 +24,11 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <bluetooth/buf.h>
 #include <bluetooth/hci.h>
-#include <bluetooth/conn.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** @brief Callback for notifying that Bluetooth has been enabled.
  *
@@ -48,11 +50,114 @@ int bt_enable(bt_ready_cb_t cb);
 
 /* Advertising API */
 
-struct bt_eir {
-	uint8_t len;
+/** Description of different data types that can be encoded into
+  * advertising data. Used to form arrays that are passed to the
+  * bt_le_adv_start() function.
+  */
+struct bt_data {
 	uint8_t type;
-	uint8_t data[29];
-} __packed;
+	uint8_t data_len;
+	const uint8_t *data;
+};
+
+/** @brief Helper to declare elements of bt_data arrays
+ *
+ *  This macro is mainly for creating an array of struct bt_data
+ *  elements which is then passed to bt_le_adv_start().
+ *
+ *  @param _type Type of advertising data field
+ *  @param _data Pointer to the data field payload
+ *  @param _data_len Number of bytes behind the _data pointer
+ */
+#define BT_DATA(_type, _data, _data_len) \
+	{ \
+		.type = (_type), \
+		.data_len = (_data_len), \
+		.data = (_data), \
+	}
+
+/** @brief Helper to declare elements of bt_data arrays
+ *
+ *  This macro is mainly for creating an array of struct bt_data
+ *  elements which is then passed to bt_le_adv_start().
+ *
+ *  @param _type Type of advertising data field
+ *  @param _bytes Variable number of single-byte parameters
+ */
+#define BT_DATA_BYTES(_type, _bytes...) \
+	BT_DATA(_type, ((uint8_t []) { _bytes }), \
+		sizeof((uint8_t []) { _bytes }))
+
+/** Local advertising address type */
+enum {
+	/** Use local identity address for advertising. Unless a static
+	  * random address has been configured this will be the public
+	  * address.
+	  */
+	BT_LE_ADV_ADDR_IDENTITY,
+
+	/** Use local Non-resolvable Private Address (NRPA) for advertising */
+	BT_LE_ADV_ADDR_NRPA,
+};
+
+/** LE Advertising Parameters. */
+struct bt_le_adv_param {
+	/** Advertising type */
+	uint8_t  type;
+
+	/** Which type of own address to use for advertising */
+	uint8_t  addr_type;
+
+	/** Minimum Advertising Interval (N * 0.625) */
+	uint16_t interval_min;
+
+	/** Maximum Advertising Interval (N * 0.625) */
+	uint16_t interval_max;
+};
+
+/** Helper to declare advertising parameters inline
+  *
+  * @param _type      Advertising Type
+  * @param _addr_type Local address type to use for advertising
+  * @param _int_min   Minimum advertising interval
+  * @param _int_max   Maximum advertising interval
+  */
+#define BT_LE_ADV_PARAM(_type, _addr_type, _int_min, _int_max) \
+		(&(struct bt_le_adv_param) { \
+			.type = (_type), \
+			.addr_type = (_addr_type), \
+			.interval_min = (_int_min), \
+			.interval_max = (_int_max), \
+		 })
+
+#define BT_LE_ADV(t) BT_LE_ADV_PARAM(t, BT_LE_ADV_ADDR_IDENTITY, \
+				     BT_GAP_ADV_FAST_INT_MIN_2, \
+				     BT_GAP_ADV_FAST_INT_MAX_2)
+
+/** @brief Start advertising
+ *
+ *  Set advertisement data, scan response data, advertisement parameters
+ *  and start advertising.
+ *
+ *  @param param Advertising parameters.
+ *  @param ad Data to be used in advertisement packets.
+ *  @param ad_len Number of elements in ad
+ *  @param sd Data to be used in scan response packets.
+ *  @param sd_len Number of elements in sd
+ *
+ *  @return Zero on success or (negative) error code otherwise.
+ */
+int bt_le_adv_start(const struct bt_le_adv_param *param,
+		    const struct bt_data *ad, size_t ad_len,
+		    const struct bt_data *sd, size_t sd_len);
+
+/** @brief Stop advertising
+ *
+ *  Stops ongoing advertising.
+ *
+ *  @return Zero on success or (negative) error code otherwise.
+ */
+int bt_le_adv_stop(void);
 
 /** @brief Define a type allowing user to implement a function that can
  *  be used to get back active LE scan results.
@@ -69,49 +174,69 @@ struct bt_eir {
  *  @param len Length of advertiser data contained in buffer.
  */
 typedef void bt_le_scan_cb_t(const bt_addr_le_t *addr, int8_t rssi,
-		             uint8_t adv_type, const uint8_t *adv_data,
-		             uint8_t len);
+			     uint8_t adv_type, const uint8_t *adv_data,
+			     uint8_t len);
 
-/** @brief Start advertising
+/** LE scan parameters */
+struct bt_le_scan_param {
+	/** Scan type (BT_HCI_LE_SCAN_ACTIVE or BT_HCI_LE_SCAN_PASSIVE) */
+	uint8_t  type;
+
+	/** Duplicate filtering (BT_HCI_LE_SCAN_FILTER_DUP_ENABLE or
+	 *  BT_HCI_LE_SCAN_FILTER_DUP_DISABLE)
+	 */
+	uint8_t  filter_dup;
+
+	/** Scan interval (N * 0.625 ms) */
+	uint16_t interval;
+
+	/** Scan window (N * 0.625 ms) */
+	uint16_t window;
+};
+
+/** Helper to declare scan parameters inline
+  *
+  * @param _type     Scan Type (BT_HCI_LE_SCAN_ACTIVE/BT_HCI_LE_SCAN_PASSIVE)
+  * @param _filter   Filter Duplicates
+  * @param _interval Scan Interval (N * 0.625 ms)
+  * @param _window   Scan Window (N * 0.625 ms)
+  */
+#define BT_LE_SCAN_PARAM(_type, _filter, _interval, _window) \
+		(&(struct bt_le_scan_param) { \
+			.type = (_type), \
+			.filter_dup = (_filter), \
+			.interval = (_interval), \
+			.window = (_window), \
+		 })
+
+/** Helper macro to enable active scanning to discover new devices. */
+#define BT_LE_SCAN_ACTIVE BT_LE_SCAN_PARAM(BT_HCI_LE_SCAN_ACTIVE, \
+					   BT_HCI_LE_SCAN_FILTER_DUP_ENABLE, \
+					   BT_GAP_SCAN_FAST_INTERVAL, \
+					   BT_GAP_SCAN_FAST_WINDOW)
+
+/** Helper macro to enable passive scanning to discover new devices.
  *
- *  Set advertisement data, scan response data, advertisement parameters
- *  and start advertising.
- *
- *  @param type Advertising type.
- *  @param ad Data to be used in advertisement packets.
- *  @param sd Data to be used in scan response packets.
- *
- *  @return Zero on success or (negative) error code otherwise.
+ * This macro should be used if information required for device identification
+ * (eg UUID) are known to be placed in Advertising Data.
  */
-int bt_start_advertising(uint8_t type, const struct bt_eir *ad,
-			 const struct bt_eir *sd);
-
-/** @brief Stop advertising
- *
- *  Stops ongoing advertising.
- *
- *  @return Zero on success or (negative) error code otherwise.
- */
-int bt_stop_advertising(void);
-
-/** Filter out duplicate scanning results. **/
-typedef enum {
-	BT_SCAN_FILTER_DUP_DISABLE,
-	BT_SCAN_FILTER_DUP_ENABLE,
-} bt_scan_filter_dup_t;
+#define BT_LE_SCAN_PASSIVE BT_LE_SCAN_PARAM(BT_HCI_LE_SCAN_PASSIVE, \
+					    BT_HCI_LE_SCAN_FILTER_DUP_ENABLE, \
+					    BT_GAP_SCAN_FAST_INTERVAL, \
+					    BT_GAP_SCAN_FAST_WINDOW)
 
 /** @brief Start (LE) scanning
  *
  *  Start LE scanning with and provide results through the specified
  *  callback.
  *
- *  @param filter_dups Enable duplicate filtering (or not).
+ *  @param param Scan parameters.
  *  @param cb Callback to notify scan results.
  *
  *  @return Zero on success or error code otherwise, positive in case
  *  of protocol error or negative (POSIX) in case of stack internal error
  */
-int bt_start_scanning(bt_scan_filter_dup_t filter, bt_le_scan_cb_t cb);
+int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
 
 /** @brief Stop (LE) scanning.
  *
@@ -120,45 +245,7 @@ int bt_start_scanning(bt_scan_filter_dup_t filter, bt_le_scan_cb_t cb);
  *  @return Zero on success or error code otherwise, positive in case
  *  of protocol error or negative (POSIX) in case of stack internal error
  */
-int bt_stop_scanning(void);
-
-#if defined(CONFIG_BLUETOOTH_SMP)
-/** Authenticated pairing callback structure */
-struct bt_auth_cb {
-	void (*passkey_display)(struct bt_conn *conn, unsigned int passkey);
-	void (*passkey_entry)(struct bt_conn *conn);
-	void (*cancel)(struct bt_conn *conn);
-};
-
-/** @brief Register authentication callbacks.
- *
- *  Register callbacks to handle authenticated pairing. Passing NULL unregisters
- *  previous callbacks structure.
- *
- *  @param cb Callback struct.
- *
- *  @return Zero on success or negative error code otherwise
- */
-int bt_auth_cb_register(const struct bt_auth_cb *cb);
-
-/** @brief Reply with entered passkey.
- *
- *  This function should be called only after passkey_entry callback from
- *  bt_auth_cb structure was called.
- *
- *  @param conn Connection object.
- *  @param passkey Entered passkey.
- */
-void bt_auth_passkey_entry(struct bt_conn *conn, unsigned int passkey);
-
-/** @brief Cancel ongoing authenticated pairing.
- *
- *  This function allows to cancel ongoing authenticated pairing.
- *
- *  @param conn Connection object.
- */
-void bt_auth_cancel(struct bt_conn *conn);
-#endif /* CONFIG_BLUETOOTH_SMP */
+int bt_le_scan_stop(void);
 
 /** @def BT_ADDR_STR_LEN
  *
@@ -228,4 +315,37 @@ static inline int bt_addr_le_to_str(const bt_addr_le_t *addr, char *str,
 			addr->val[5], addr->val[4], addr->val[3],
 			addr->val[2], addr->val[1], addr->val[0], type);
 }
+
+#if defined(CONFIG_BLUETOOTH_BREDR)
+/** @brief Enable/disable set controller in discoverable state.
+ *
+ *  Allows make local controller to listen on INQUIRY SCAN channel and responds
+ *  to devices making general inquiry. To enable this state it's mandatory
+ *  to first be in connectable state.
+ *
+ *  @param enable Value allowing/disallowing controller to become discoverable.
+ *
+ *  @return Negative if fail set to requested state or requested state has been
+ *  already set. Zero if done successfully.
+ */
+int bt_br_set_discoverable(bool enable);
+
+/** @brief Enable/disable set controller in connectable state.
+ *
+ *  Allows make local controller to be connectable. It means the controller
+ *  start listen to devices requests on PAGE SCAN channel. If disabled also
+ *  resets discoverability if was set.
+ *
+ *  @param enable Value allowing/disallowing controller to be connectable.
+ *
+ *  @return Negative if fail set to requested state or requested state has been
+ *  already set. Zero if done successfully.
+ */
+int bt_br_set_connectable(bool enable);
+#endif
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* __BT_BLUETOOTH_H */

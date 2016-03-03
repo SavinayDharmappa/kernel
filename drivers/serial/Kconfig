@@ -33,136 +33,69 @@ config SERIAL_HAS_DRIVER
 	to signal that there is a serial driver. This is being used
 	by other drivers which are dependent on serial.
 
-menu "Serial Port Options"
-
-config SERIAL_INTERRUPT_LEVEL
-	bool "Serial interrupt level"
-	depends on IOAPIC
-	default y
-	help
-	Option signifies that the serial controller uses level interrupts
-	instead of edge
-
-config SERIAL_INTERRUPT_LOW
-	bool "Serial interrupt low"
-	depends on IOAPIC
-	default n
-	help
-	Option signifies that the serial controller uses low level interrupts
-	instead of high
-
 config  UART_INTERRUPT_DRIVEN
 	bool
-	prompt "Interrupt driven UART support"
+	prompt "Enable UART Interrupt support"
 	default n
 	help
 	This option enables interrupt support for UART allowing console
-	input and UART based drivers.
-endmenu
+	input and other UART based drivers.
 
-config NS16550
-	bool "NS16550 serial driver"
+choice
+	prompt "UART IRQ Trigger Condition"
+	default UART_IRQ_RISING_EDGE
+	depends on UART_INTERRUPT_DRIVEN
+
+config UART_IRQ_FALLING_EDGE
+	bool "Falling Edge"
+	help
+	This option signifies that the UART uses falling edge interrupt.
+
+config UART_IRQ_RISING_EDGE
+	bool "Rising Edge"
+	help
+	This option signifies that the UART uses rising edge interrupt.
+
+config UART_IRQ_LEVEL_HIGH
+	bool "Level High"
+	help
+	This option signifies that the UART uses level high interrupt.
+
+config UART_IRQ_LEVEL_LOW
+	bool "Level Low"
+	help
+	This option signifies that the UART uses level low interrupt.
+
+endchoice
+
+config UART_LINE_CTRL
+	bool "Enable Serial Line Control API"
 	default n
-	select SERIAL_HAS_DRIVER
 	help
-	This option enables the NS16550 serial driver.
-	This driver can be used for the serial hardware
-	available on x86 platforms such as basic_atom and
-	basic_minuteia.
+	This enables the API for apps to control the serial line,
+	such as baud rate, CTS and RTS.
 
-config NS16550_PCI
-	bool "NS16550 PCI serial driver"
+	Implementation is up to individual driver.
+
+	Says no if not sure.
+
+config UART_DRV_CMD
+	bool "Enable driver commands API"
 	default n
-	depends on PCI && NS16550
 	help
-	This enables NS16550 to probe for PCI-based serial devices.
+	This enables the API to send extra commands to drivers.
+	This allows drivers to expose hardware specific functions.
 
-	This option enables the driver to auto-detect the device
-	configuration required to access those ports.
+	Says no if not sure.
 
-config NS16550_PORT_0_BASE_ADDR
-	hex "NS16550 port 0 PCI base address"
-	default 0x00000000
-	depends on NS16550_PCI
+source "drivers/serial/Kconfig.ns16550"
 
-config NS16550_PORT_1_BASE_ADDR
-	hex "NS16550 port 1 PCI base address"
-	default 0x00000000
-	depends on NS16550_PCI
+source "drivers/serial/Kconfig.k20"
 
-config K20_UART
-	bool "K20 serial driver"
-	default n
-	select SERIAL_HAS_DRIVER
-	help
-	This option enables the K20 serial driver.
-	This specific driver can be used for the serial hardware
-	available at the Freescale FRDM K64F platform.
+source "drivers/serial/Kconfig.stellaris"
 
-config STELLARIS_UART
-	bool "Stellaris serial driver"
-	default n
-	select SERIAL_HAS_DRIVER
-	help
-	This option enables the Stellaris serial driver.
-	This specific driver can be used for the serial hardware
-	available at the Texas Instrument LM3S6965 platform.
+source "drivers/serial/Kconfig.nsim"
 
-
-config UART_PORT_0_NAME
-	string
-	default "UART_0"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_1_NAME
-	string
-	default "UART_1"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_2_NAME
-	string
-	default "UART_2"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_3_NAME
-	string
-	default "UART_3"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_4_NAME
-	string
-	default "UART_4"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_5_NAME
-	string
-	default "UART_5"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_6_NAME
-	string
-	default "UART_6"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
-
-config UART_PORT_7_NAME
-	string
-	default "UART_7"
-	help
-	This is the device name for UART, and is included in the device
-	struct.
+source "drivers/serial/Kconfig.atmel_sam3"
 
 endif

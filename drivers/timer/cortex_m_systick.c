@@ -1,5 +1,3 @@
-/* ARM Cortex-M systick device driver */
-
 /*
  * Copyright (c) 2013-2015 Wind River Systems, Inc.
  *
@@ -16,25 +14,27 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements the kernel's CORTEX-M ARM's systick device driver.
-It provides the standard kernel "system clock driver" interfaces.
-
-The driver utilizes systick to provide kernel ticks.
-
-\INTERNAL IMPLEMENTATION DETAILS
-The systick device provides a 24-bit clear-on-write, decrementing,
-wrap-on-zero counter. Only edge sensitive triggered interrupt is supported.
-
-\INTERNAL PACKAGING DETAILS
-The systick device driver is part of the microkernel in both a monolithic kernel
-system and a split kernel system; it is not included in the nanokernel portion
-of a split kernel.
-
-The device driver is also part of a nanokernel-only system, but omits more
-complex capabilities (such as tickless idle support) that are only used in
-conjunction with a microkernel.
+/**
+ * @file
+ * @brief ARM Cortex-M systick device driver
+ *
+ * This module implements the kernel's CORTEX-M ARM's systick device driver.
+ * It provides the standard kernel "system clock driver" interfaces.
+ *
+ * The driver utilizes systick to provide kernel ticks.
+ *
+ * \INTERNAL IMPLEMENTATION DETAILS
+ * The systick device provides a 24-bit clear-on-write, decrementing,
+ * wrap-on-zero counter. Only edge sensitive triggered interrupt is supported.
+ *
+ * \INTERNAL PACKAGING DETAILS
+ * The systick device driver is part of the microkernel in both a monolithic
+ * kernel system and a split kernel system; it is not included in the
+ * nanokernel portion of a split kernel.
+ *
+ * The device driver is also part of a nanokernel-only system, but omits more
+ * complex capabilities (such as tickless idle support) that are only used in
+ * conjunction with a microkernel.
  */
 
 #include <nanokernel.h>
@@ -53,7 +53,7 @@ extern struct nano_stack _k_command_stack;
 #endif /* CONFIG_MICROKERNEL */
 
 /* running total of timer count */
-static uint32_t clock_accumulated_count = 0;
+static uint32_t clock_accumulated_count;
 
 /*
  * A board support package's board.h header must provide definitions for the
@@ -71,8 +71,7 @@ static uint32_t clock_accumulated_count = 0;
  * (__systick), can be found in systick_gdb.s. In this case, the handler
  * in this file becomes _Systick() and will be called by __systick.
  */
-#if defined(CONFIG_GDB_INFO) || defined(CONFIG_ARM_DEBUG_ESF)
-void _real_timer_int_handler(void *);
+#ifdef CONFIG_GDB_INFO
 #define _TIMER_INT_HANDLER _real_timer_int_handler
 #else
 #define _TIMER_INT_HANDLER _timer_int_handler
@@ -102,9 +101,9 @@ extern int32_t _sys_idle_elapsed_ticks;
 
 #ifdef CONFIG_TICKLESS_IDLE
 static uint32_t __noinit default_load_value; /* default count */
-static uint32_t idle_original_count = 0;
+static uint32_t idle_original_count;
 static uint32_t __noinit max_system_ticks;
-static uint32_t idle_original_ticks = 0;
+static uint32_t idle_original_ticks;
 static uint32_t __noinit max_load_value;
 static uint32_t __noinit timer_idle_skew;
 static unsigned char timer_mode = TIMER_MODE_PERIODIC;
@@ -121,10 +120,7 @@ static unsigned char idle_mode = IDLE_NOT_TICKLESS;
  * This routine disables the systick counter.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void sysTickStop(void)
 {
 	union __stcsr reg;
@@ -150,10 +146,7 @@ static ALWAYS_INLINE void sysTickStop(void)
  * This routine enables the systick counter.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void sysTickStart(void)
 {
 	union __stcsr reg;
@@ -179,8 +172,6 @@ static ALWAYS_INLINE void sysTickStart(void)
  * interrupt.
  *
  * @return the current counter value
- *
- * \NOMANUAL
  */
 static ALWAYS_INLINE uint32_t sysTickCurrentGet(void)
 {
@@ -194,8 +185,6 @@ static ALWAYS_INLINE uint32_t sysTickCurrentGet(void)
  * This routine returns the value from the reload value register.
  *
  * @return the counter's initial count/wraparound value
- *
- * \NOMANUAL
  */
 static ALWAYS_INLINE uint32_t sysTickReloadGet(void)
 {
@@ -213,10 +202,7 @@ static ALWAYS_INLINE uint32_t sysTickReloadGet(void)
  * Note that the value given is assumed to be valid (i.e., count < (1<<24)).
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void sysTickReloadSet(
 	uint32_t count /* count from which timer is to count down */
 	)
@@ -242,33 +228,14 @@ static ALWAYS_INLINE void sysTickReloadSet(
  * system operation) or _real_timer_int_handler (when GDB_INFO is enabled).
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
-#if CONFIG_SHOW_TIMER_HANDLER_ADDR
-#include <misc/printk.h>
-static inline void show_handler_addr(void)
-{
-	static int i = 0;
-	if (!(i & 0x7f)) {
-		printk("in timer handler @ 0x%p\n", _TIMER_INT_HANDLER);
-	}
-	++i;
-}
-#else
-static inline void show_handler_addr(void) { /* nothing */ }
-#endif
-
 void _TIMER_INT_HANDLER(void *unused)
 {
 	ARG_UNUSED(unused);
 
-	show_handler_addr();
-
-#ifdef CONFIG_PROFILER_INTERRUPT
-	extern void _sys_profiler_interrupt(void);
-	_sys_profiler_interrupt();
+#ifdef CONFIG_KERNEL_EVENT_LOGGER_INTERRUPT
+	extern void _sys_k_event_logger_interrupt(void);
+	_sys_k_event_logger_interrupt();
 #endif
 
 
@@ -379,16 +346,8 @@ void _TIMER_INT_HANDLER(void *unused)
 
 #endif /* CONFIG_ADVANCED_POWER_MANAGEMENT */
 
-#if defined(CONFIG_ARM_DEBUG_ESF)
-	/*
-	 * Return to _timer_int_handler stub. We cannot call _ExcExit() like in the
-	 * "normal" case because the function call prologue messes up the stack
-	 * frame that _GDB_STUB_EXC_EXIT expects.
-	 */
-#else
 	extern void _ExcExit(void);
 	_ExcExit();
-#endif
 }
 
 #ifdef CONFIG_TICKLESS_IDLE
@@ -407,15 +366,13 @@ void _TIMER_INT_HANDLER(void *unused)
  * more elapsed ticks during a "tickless idle".
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void sysTickTicklessIdleInit(void)
 {
 	/* enable counter, disable interrupt and set clock src to system clock
 	 */
 	union __stcsr stcsr = {.bit = {1, 0, 1, 0, 0, 0} };
+
 	volatile uint32_t dummy; /* used to help determine the 'skew time' */
 
 	/* store the default reload value (which has already been set) */
@@ -485,7 +442,6 @@ static void sysTickTicklessIdleInit(void)
  *
  * @return N/A
  */
-
 void _timer_idle_enter(int32_t ticks /* system ticks */
 				)
 {
@@ -502,20 +458,19 @@ void _timer_idle_enter(int32_t ticks /* system ticks */
 	if ((ticks == -1) || (ticks > max_system_ticks)) {
 		/*
 		 * We've been asked to fire the timer so far in the future that
-		 * the
-		 * required count value would not fit in the 24-bit reload
+		 * the required count value would not fit in the 24-bit reload
 		 * register.
 		 * Instead, we program for the maximum programmable interval
-		 * minus one
-		 * system tick to prevent overflow when the left over count read
-		 * earlier
-		 * is added.
+		 * minus one system tick to prevent overflow when the left over
+		 * count read earlier is added.
 		 */
 		idle_original_count += max_load_value - default_load_value;
 		idle_original_ticks = max_system_ticks - 1;
 	} else {
-		/* leave one tick of buffer to have to time react when coming
-		 * back */
+		/*
+		 * leave one tick of buffer to have to time react when coming
+		 * back
+		 */
 		idle_original_ticks = ticks - 1;
 		idle_original_count += idle_original_ticks * default_load_value;
 	}
@@ -544,7 +499,6 @@ void _timer_idle_enter(int32_t ticks /* system ticks */
  *
  * @return N/A
  */
-
 void _timer_idle_exit(void)
 {
 	uint32_t count; /* timer's current count register value */
@@ -675,14 +629,10 @@ int _sys_clock_driver_init(struct device *device)
  * systick counter is a 24-bit down counter which is reset to "reload" value
  * once it reaches 0.
  */
-
-uint32_t _sys_clock_cycle_get(void)
+uint32_t sys_cycle_get_32(void)
 {
 	return clock_accumulated_count + (__scs.systick.strvr - __scs.systick.stcvr);
 }
-
-FUNC_ALIAS(_sys_clock_cycle_get, nano_cycle_get_32, uint32_t);
-FUNC_ALIAS(_sys_clock_cycle_get, task_cycle_get_32, uint32_t);
 
 #ifdef CONFIG_SYSTEM_CLOCK_DISABLE
 
@@ -695,7 +645,6 @@ FUNC_ALIAS(_sys_clock_cycle_get, task_cycle_get_32, uint32_t);
  *
  * @return N/A
  */
-
 void sys_clock_disable(void)
 {
 	unsigned int key; /* interrupt lock level */

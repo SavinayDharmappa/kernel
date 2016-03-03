@@ -19,6 +19,13 @@
 #ifndef __SPI_H__
 #define __SPI_H__
 
+/**
+ * @brief SPI Interface
+ * @defgroup spi_interface SPI Interface
+ * @ingroup io_interfaces
+ * @{
+ */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <device.h>
@@ -45,24 +52,12 @@ extern "C" {
 #define SPI_WORD_SIZE_GET(_in_) (((_in_) & SPI_WORD_SIZE_MASK) >> 4)
 #define SPI_WORD(_in_) ((_in_) << 4)
 
-enum spi_cb_type {
-	SPI_CB_WRITE		= 1,
-	SPI_CB_READ		= 2,
-	SPI_CB_TRANSCEIVE	= 3,
-	SPI_CB_ERROR		= 4
-};
-
-/* application callback function signature */
-typedef void (*spi_callback)(struct device *dev,
-				enum spi_cb_type cb_type, void *user_data);
-
 /*
  * config is a bit field with the following parts:
- * mode			[ 0 : 1 ]   - Polarity and phase mode
- * transfer_mode	[ 2 ]       - LSB or MSB first transfer mode
- * loop_mode		[ 3 ]       - Enable or disable loopback mode
- * word_size		[ 4 : 11 ]  - Size of a data train in bits
- * RESERVED		[ 12 : 31 ] - undefined usage
+ * mode			    [ 0 : 2 ]   - Polarity, phase and loop mode
+ * transfer_mode	[ 3 ]       - LSB or MSB first transfer mode
+ * word_size		[ 4 : 11 ]  - Size of a data frame in bits
+ * RESERVED			[ 12 : 31 ] - undefined or device-specific usage
  *
  * max_sys_freq is the maximum frequency supported by the slave it
  * will deal with. This value depends on the host controller (the driver
@@ -71,11 +66,10 @@ typedef void (*spi_callback)(struct device *dev,
 struct spi_config {
 	uint32_t	config;
 	uint32_t	max_sys_freq;
-	spi_callback	callback;
 };
 
 typedef int (*spi_api_configure)(struct device *dev,
-				 struct spi_config *config, void *user_data);
+				 struct spi_config *config);
 typedef int (*spi_api_slave_select)(struct device *dev, uint32_t slave);
 typedef int (*spi_api_io)(struct device *dev,
 			  uint8_t *tx_buf, uint32_t tx_buf_len,
@@ -94,16 +88,15 @@ struct spi_driver_api {
  * @brief Configure a host controller for operating against slaves
  * @param dev Pointer to the device structure for the driver instance
  * @param config Pointer to the application provided configuration
- * @param user_data Pointer to some user application memory which will
- *                  be forwarded via the callback.
  *
  * @return DEV_OK if successful, another DEV_* code otherwise.
  */
 static inline int spi_configure(struct device *dev,
-				struct spi_config *config, void *user_data)
+				struct spi_config *config)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
-	return api->configure(dev, config, user_data);
+
+	return api->configure(dev, config);
 }
 
 /**
@@ -141,6 +134,7 @@ static inline int spi_slave_select(struct device *dev, uint32_t slave)
 static inline int spi_read(struct device *dev, uint8_t *buf, uint32_t len)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
+
 	return api->transceive(dev, NULL, 0, buf, len);
 }
 
@@ -155,6 +149,7 @@ static inline int spi_read(struct device *dev, uint8_t *buf, uint32_t len)
 static inline int spi_write(struct device *dev, uint8_t *buf, uint32_t len)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
+
 	return api->transceive(dev, buf, len, NULL, 0);
 }
 
@@ -176,6 +171,7 @@ static inline int spi_transceive(struct device *dev,
 			  uint8_t *rx_buf, uint32_t rx_buf_len)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
+
 	return api->transceive(dev, tx_buf, tx_buf_len, rx_buf, rx_buf_len);
 }
 
@@ -188,6 +184,7 @@ static inline int spi_transceive(struct device *dev,
 static inline int spi_suspend(struct device *dev)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
+
 	return api->suspend(dev);
 }
 
@@ -200,11 +197,16 @@ static inline int spi_suspend(struct device *dev)
 static inline int spi_resume(struct device *dev)
 {
 	struct spi_driver_api *api = (struct spi_driver_api *)dev->driver_api;
+
 	return api->resume(dev);
 }
 
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @}
+ */
 
 #endif /* __SPI_H__ */

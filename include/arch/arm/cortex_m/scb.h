@@ -1,5 +1,3 @@
-/* scb.h - ARM CORTEX-M System Control Block interface */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,27 +14,34 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Provide an interface to the System Control Block found on ARM Cortex-M
-processors.
-
-The API does not account for all possible usages of the SCB, only the
-functionalities needed by the kernel. It does not contain NVIC
-functionalities either: these can be found in nvic.h. MPU functionalities
-are not implemented.
-
-The same effect can be achieved by directly writing in the registers of the
-SCB, with the layout available from scs.h, using the __scs.scb data
-structure (or hardcoded values), but the APIs found here are less error-prone,
-especially for registers with multiple instances to account for 16 exceptions.
-
-If access to a missing functionality is needed, directly writing to the
-registers is the way to implement it.
+/**
+ * @file
+ * @brief ARM CORTEX-M System Control Block interface
+ *
+ * Provide an interface to the System Control Block found on ARM Cortex-M
+ * processors.
+ *
+ * The API does not account for all possible usages of the SCB, only the
+ * functionalities needed by the kernel. It does not contain NVIC
+ * functionalities either: these can be found in nvic.h. MPU functionalities
+ * are not implemented.
+ *
+ * The same effect can be achieved by directly writing in the registers of the
+ * SCB, with the layout available from scs.h, using the __scs.scb data
+ * structure (or hardcoded values), but the APIs found here are less
+ * error-prone, especially for registers with multiple instances to account
+ * for 16 exceptions.
+ *
+ * If access to a missing functionality is needed, directly writing to the
+ * registers is the way to implement it.
  */
 
 #ifndef _SCB__H_
 #define _SCB__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 
@@ -1200,5 +1205,9 @@ static inline void _ScbUsageFaultAllFaultsReset(void)
 	__scs.scb.cfsr.byte.ufsr.val = 0xffff;
 }
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SCB__H_ */

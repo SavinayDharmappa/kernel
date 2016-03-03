@@ -29,6 +29,10 @@
 
 #include <microkernel/base_api.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define INVALID_VECTOR 0xFFFFFFFF
 
 /**
@@ -44,18 +48,12 @@
  * @param irq_obj IRQ object identifier
  * @param irq Request IRQ
  * @param priority Requested interrupt priority
+ * @param flags IRQ flags
  *
  * @return assigned interrupt vector if successful, INVALID_VECTOR if not
  */
-extern uint32_t task_irq_alloc(kirq_t irq_obj, uint32_t irq, uint32_t priority);
-/**
- * @cond internal
- */
-extern int _task_irq_test(kirq_t irq_ob, int32_t time);
-
-/**
- * @endcond
- */
+extern uint32_t task_irq_alloc(kirq_t irq_obj, uint32_t irq, uint32_t priority,
+			       uint32_t flags);
 
 /**
  *
@@ -68,57 +66,30 @@ extern int _task_irq_test(kirq_t irq_ob, int32_t time);
 extern void task_irq_ack(kirq_t irq_obj);
 
 /**
+ * @brief Wait for task IRQ to signal an interrupt
  *
- * @brief Free a task IRQ object
- *
- * The task IRQ object's interrupt is disabled, and the associated event
- * is flushed; the object's interrupt vector is then freed, and the object's
- * global array entry is marked as unused.
- * @param irq_obj IRQ object identifier
- * @return N/A
- */
-extern void task_irq_free(kirq_t irq_obj);
-
-/**
- * @brief Determine if a task IRQ object has had an interrupt
- *
- * This tests a task IRQ object to see if it has signaled an interrupt.
- * It fails immediately if no interrupt has occurred.
+ * This routine waits up to @a timeout ticks for the IRQ object @a irq_obj
+ * to signal an interrupt.
  *
  * @param irq_obj IRQ object identifier
+ * @param timeout Affects the action taken should the task IRQ not yet be
+ * signaled. If TICKS_NONE, the return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. Otherwise wait up to the specified number of
+ * ticks before timing out.
  *
- * @return RC_OK, RC_FAIL
+ * @retval RC_OK Successfully detected signaled interrupt
+ * @retval RC_TIME Timed out while waiting for interrupt
+ * @retval RC_FAIL Failed to immediately detect signaled interrupt when
+ * @a timeout = TICKS_NONE
  */
-#define task_irq_test(irq_obj) _task_irq_test(irq_obj, TICKS_NONE)
-
-/**
- * @brief Determine if a task IRQ object has had an interrupt and wait
- *
- * This tests a task IRQ object to see if it has signaled an interrupt.
- * It waits forever for a interrupt to happen.
- *
- * @param irq_obj IRQ object identifier
- *
- * @return RC_OK
- */
-#define task_irq_test_wait(irq_obj) _task_irq_test(irq_obj, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-/**
- * @brief Determine if a task IRQ object has had an interrupt and timeout
- *
- * This tests a task IRQ object to see if it has signaled an interrupt
- * with a timeout option.
- *
- * @param irq_obj IRQ object identifier
- * @param time  Time to wait (in ticks)
- *
- * @return RC_OK, RC_FAIL, or RC_TIME
- */
-#define task_irq_test_wait_timeout(irq_obj, time) _task_irq_test(irq_obj, time)
-#endif
+extern int task_irq_wait(kirq_t irq_obj, int32_t timeout);
 
 /**
  * @}
  */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* TASK_IRQ_H */

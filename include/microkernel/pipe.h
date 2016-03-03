@@ -35,12 +35,6 @@ extern "C" {
 /**
  * @cond internal
  */
-extern int _task_pipe_put(kpipe_t id,
-			void *pBuffer,
-			int iNbrBytesToWrite,
-			int *piNbrBytesWritten,
-			K_PIPE_OPTION Option,
-			int32_t TimeOut);
 
 /**
  * @internal
@@ -63,113 +57,56 @@ extern int _task_pipe_put(kpipe_t id,
 /**
  * @brief Pipe write request
  *
- * Attempt to write data from a memory buffer area to the specified pipe.
- * Fail immediately if it is not possible.
- *
- * @param i Pipe ID
- * @param b Buffer
- * @param n Number of bytes to write
- * @param pn Pointer to number of bytes written
- * @param o Pipe options
- *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, or RC_ALIGNMENT
- */
-#define task_pipe_put(i, b, n, pn, o) \
-			_task_pipe_put(i, b, n, pn, o, TICKS_NONE)
-
-/**
- * @brief Pipe write request with unlimited wait
- *
  * Attempt to write data from a memory buffer area to the
- * specified pipe and wait forever until it succeeds.
- *
- * @param i Pipe ID
- * @param b Buffer
- * @param n Number of bytes to write
- * @param pn Pointer to number of bytes written
- * @param o Pipe options
- *
- * @return RC_OK, RC_INCOMPLETE or RC_ALIGNMENT
- */
-#define task_pipe_put_wait(i, b, n, pn, o) \
-			_task_pipe_put(i, b, n, pn, o, TICKS_UNLIMITED)
-
-/**
- * @brief Pipe write request with timeout
- *
- * Attemp to write data from a memory buffer area to the
  * specified pipe with a timeout option.
  *
  * @param id Pipe ID
- * @param b Buffer
- * @param n Number of bytes to write
- * @param pn Pointer to number of bytes written
- * @param o Pipe options
- * @param t Timeout
+ * @param buffer Buffer
+ * @param bytes_to_write Number of bytes to write
+ * @param bytes_written Pointer to number of bytes written
+ * @param options Pipe options
+ * @param timeout Affects the action taken should the pipe be full. If
+ * TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as long
+ * as necessary. Otherwise wait up to the specified number of ticks before
+ * timing out.
  *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, RC_TIME, or RC_ALIGNMENT
+ * @retval RC_OK Successfully wrote data to pipe
+ * @retval RC_ALIGNMENT Data is improperly aligned
+ * @retval RC_INCOMPLETE Only some of the data was written to the pipe when
+ * @a options = _ALL_N
+ * @retval RC_TIME Timed out waiting to write to pipe
+ * @retval RC_FAIL Failed to immediately write to pipe when
+ * @a timeout = TICKS_NONE
  */
-#define task_pipe_put_wait_timeout(id, b, n, pn, o, t) \
-			_task_pipe_put(id, b, n, pn, o, t)
-
-
-extern int _task_pipe_get(kpipe_t id,
-			void *pBuffer,
-			int iNbrBytesToRead,
-			int *piNbrBytesRead,
-			K_PIPE_OPTION Option,
-			int32_t TimeOut);
+extern int task_pipe_put(kpipe_t id, void *buffer, int bytes_to_write,
+			int *bytes_written, K_PIPE_OPTION options, int32_t timeout);
 
 /**
  * @brief Pipe read request
  *
  * Attempt to read data into a memory buffer area from the
- * specified pipe and fail immediately if not possible.
+ * specified pipe with a timeout option.
  *
  * @param id Pipe ID
- * @param b Buffer
- * @param n Number of bytes to read
- * @param pn Pointer to number of bytes read
- * @param o Pipe options
+ * @param buffer Buffer
+ * @param bytes_to_read Number of bytes to read
+ * @param bytes_read Pointer to number of bytes read
+ * @param options Pipe options
+ * @param timeout Affects the action taken should the pipe be empty. If
+ * TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as long
+ * as necessary. Otherwise wait up to the specified number of ticks before
+ * timing out.
  *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, or RC_ALIGNMENT
+ * @retval RC_OK Successfully read data from pipe
+ * @retval RC_ALIGNMENT Data is improperly aligned
+ * @retval RC_INCOMPLETE Only some of the data was read from the pipe when
+ * @a options = _ALL_N
+ * @retval RC_TIME Timed out waiting to read from pipe
+ * @retval RC_FAIL Failed to immediately read from pipe when
+ * @a timeout = TICKS_NONE
  */
-#define task_pipe_get(id, b, n, pn, o) \
-			_task_pipe_get(id, b, n, pn, o, TICKS_NONE)
-/**
- * @brief Pipe read request and wait
- *
- * Attempt to read data into a memory buffer area from the
- * specified pipe and wait forever until it succeeds.
- *
- * @param id Pipe ID
- * @param b Buffer
- * @param n Number of bytes to read
- * @param pn Pointer to number of bytes read
- * @param o Pipe options
- *
- * @return RC_OK, RC_INCOMPLETE, or RC_ALIGNMENT
- */
-#define task_pipe_get_wait(id, b, n, pn, o) \
-			_task_pipe_get(id, b, n, pn, o, TICKS_UNLIMITED)
-/**
- * @brief Pipe read request
- *
- * This routine attempts to read data into a memory buffer area from the
- * specified pipe, with a possible timeout option.
- *
- * @param id Pipe ID
- * @param b Buffer
- * @param n Number of bytes to read
- * @param pn Pointer to number of bytes read
- * @param o Pipe options
- * @param t Timeout
- *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, RC_TIME, or RC_ALIGNMENT
- */
-#define task_pipe_get_wait_timeout(id, b, n, pn, o, t) \
-			_task_pipe_get(id, b, n, pn, o, t)
-
+extern int task_pipe_get(kpipe_t id, void *buffer, int bytes_to_read,
+			int *bytes_read, K_PIPE_OPTION options, int32_t timeout);
 
 extern int _task_pipe_block_put(kpipe_t id,
 				struct k_block block,
@@ -205,7 +142,7 @@ extern int _task_pipe_block_put(kpipe_t id,
 	struct _k_pipe_struct _k_pipe_obj_##name = \
 		__K_PIPE_INITIALIZER(size, __pipe_buffer_##name); \
 	const kpipe_t name \
-		__section(_k_pipe_ptr, private, pipe) = \
+		__in_section(_k_pipe_ptr, private, pipe) = \
 		(kpipe_t)&_k_pipe_obj_##name;
 
 /**

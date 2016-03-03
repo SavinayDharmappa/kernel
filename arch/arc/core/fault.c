@@ -1,5 +1,3 @@
-/* fault.c - common fault handler for ARCv2 */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,8 +14,10 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief Common fault handler for ARCv2
+ *
  * Common fault handler for ARCv2 processors.
  */
 
@@ -52,10 +52,7 @@
  * (short form).
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 void _FaultDump(const NANO_ESF *esf, int fault)
 {
 	ARG_UNUSED(esf);
@@ -81,10 +78,7 @@ void _FaultDump(const NANO_ESF *esf, int fault)
  * responsible for implementing the error handling policy.
  *
  * @return This function does not return.
- *
- * \NOMANUAL
  */
-
 void _Fault(void)
 {
 	uint32_t ecr = _arc_v2_aux_reg_read(_ARC_V2_ECR);

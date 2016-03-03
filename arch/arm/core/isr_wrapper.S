@@ -1,5 +1,3 @@
-/* isr_wrapper.S - ARM CORTEX-M3 wrapper for ISRs with parameter  */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Wrapper installed in vector table for handling dynamic interrupts that accept
-a parameter.
+/**
+ * @file
+ * @brief ARM CORTEX-M3 wrapper for ISRs with parameter
+ *
+ * Wrapper installed in vector table for handling dynamic interrupts that accept
+ * a parameter.
  */
 
 #define _ASMLANGUAGE
@@ -58,9 +57,15 @@ SECTION_FUNC(TEXT, _isr_wrapper)
 
 	push {lr}		/* lr is now the first item on the stack */
 
-#ifdef CONFIG_PROFILER_INTERRUPT
+#ifdef CONFIG_KERNEL_EVENT_LOGGER_INTERRUPT
 	push {lr}
-	bl _sys_profiler_interrupt
+	bl _sys_k_event_logger_interrupt
+	pop {lr}
+#endif
+
+#ifdef CONFIG_KERNEL_EVENT_LOGGER_SLEEP
+	push {lr}
+	bl _sys_k_event_logger_exit_sleep
 	pop {lr}
 #endif
 

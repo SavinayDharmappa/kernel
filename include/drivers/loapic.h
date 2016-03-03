@@ -54,28 +54,35 @@ extern "C" {
 /* Local APIC Vector Table Bits */
 #define LOAPIC_LVT_MASKED 0x00010000   /* mask */
 
-#ifdef _ASMLANGUAGE
-GTEXT(_loapic_eoi)
+#ifndef _ASMLANGUAGE
+#include <device.h>
 
-.macro loapic_mkstub device isr
-GTEXT(_\()\device\()_\()\isr\()_stub)
-
-SECTION_FUNC(TEXT, _\()\device\()_\()\isr\()_stub)
-        call    _IntEnt         /* Inform kernel interrupt has begun */
-        pushl   $0              /* Push dummy parameter */
-        call    \isr            /* Call actual interrupt handler */
-        call    _loapic_eoi     /* Inform loapic interrupt is done */
-        addl    $4, %esp        /* Clean-up stack from push above */
-        jmp     _IntExit        /* Inform kernel interrupt is done */
-.endm
-#else /* _ASMLANGUAGE */
-extern int _loapic_init(struct device *unused);
-extern void _loapic_eoi(unsigned int irq);
 extern void _loapic_int_vec_set(unsigned int irq, unsigned int vector);
 extern void _loapic_irq_enable(unsigned int irq);
 extern void _loapic_irq_disable(unsigned int irq);
 extern void _loapic_enable(void);
 extern void _loapic_disable(void);
+extern int _loapic_isr_vector_get(void);
+
+#if CONFIG_EOI_FORWARDING_BUG
+extern void _lakemont_eoi(void);
+#endif
+
+/**
+ *
+ * @brief  send EOI (End Of Interrupt) signal to Local APIC
+ *
+ * This routine sends an EOI signal to the Local APIC's interrupting source.
+ *
+ * @return N/A
+ */
+static inline void _loapic_eoi(void)
+{
+#if CONFIG_EOI_FORWARDING_BUG
+	_lakemont_eoi();
+#endif
+	*(volatile int *)(CONFIG_LOAPIC_BASE_ADDRESS + LOAPIC_EOI) = 0;
+}
 #endif /* _ASMLANGUAGE */
 
 #ifdef __cplusplus

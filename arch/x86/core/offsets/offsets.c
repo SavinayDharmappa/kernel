@@ -1,5 +1,3 @@
-/* offsets.c - nanokernel structure member offset definition file */
-
 /*
  * Copyright (c) 2010-2014 Wind River Systems, Inc.
  *
@@ -16,21 +14,22 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module is responsible for the generation of the absolute symbols whose
-value represents the member offsets for various IA-32 nanokernel structures.
-
-All of the absolute symbols defined by this module will be present in the
-final microkernel or nanokernel ELF image (due to the linker's reference to
-the _OffsetAbsSyms symbol).
-
-INTERNAL
-It is NOT necessary to define the offset for every member of a structure.
-Typically, only those members that are accessed by assembly language routines
-are defined; however, it doesn't hurt to define all fields for the sake of
-completeness.
-
+/**
+ * @file
+ * @brief Nanokernel structure member offset definition file
+ *
+ * This module is responsible for the generation of the absolute symbols whose
+ * value represents the member offsets for various IA-32 nanokernel structures.
+ *
+ * All of the absolute symbols defined by this module will be present in the
+ * final microkernel or nanokernel ELF image (due to the linker's reference to
+ * the _OffsetAbsSyms symbol).
+ *
+ * INTERNAL
+ * It is NOT necessary to define the offset for every member of a structure.
+ * Typically, only those members that are accessed by assembly language routines
+ * are defined; however, it doesn't hurt to define all fields for the sake of
+ * completeness.
  */
 
 #include <gen_offset.h> /* located in kernel/arch/common/include */
@@ -94,13 +93,11 @@ GEN_ABSOLUTE_SYM(__tSwapStk_SIZEOF, sizeof(tSwapStk));
 
 /* NANO_ESF structure member offsets */
 
-#ifdef CONFIG_DEBUG_INFO
 GEN_OFFSET_SYM(NANO_ESF, esp);
 GEN_OFFSET_SYM(NANO_ESF, ebp);
 GEN_OFFSET_SYM(NANO_ESF, ebx);
 GEN_OFFSET_SYM(NANO_ESF, esi);
 GEN_OFFSET_SYM(NANO_ESF, edi);
-#endif /* CONFIG_DEBUG_INFO */
 GEN_OFFSET_SYM(NANO_ESF, edx);
 GEN_OFFSET_SYM(NANO_ESF, ecx);
 GEN_OFFSET_SYM(NANO_ESF, eax);

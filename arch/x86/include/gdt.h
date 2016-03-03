@@ -1,5 +1,3 @@
-/* gdt.h - IA-32 Global Descriptor Table (GDT) definitions */
-
 /*
  * Copyright (c) 2011-2012, 2014 Wind River Systems, Inc.
  *
@@ -16,16 +14,22 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This file provides definitions for the Global Descriptor Table (GDT) for the
-IA-32 architecture.
+/**
+ * @file
+ * @brief IA-32 Global Descriptor Table (GDT) definitions
+ *
+ * This file provides definitions for the Global Descriptor Table (GDT) for the
+ * IA-32 architecture.
  */
 
 #ifndef _GDT_H
 #define _GDT_H
 
 #include <arch/x86/arch.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _ASMLANGUAGE
 
@@ -59,8 +63,15 @@ typedef struct __packed s_gdtHeader
 
 /* externs */
 
-extern tGdtHeader _gdt; /* GDT is implemented in arch/x86/core/gdt.c */
-
+/* This is either the ROM-based GDT in crt0.S or RAM-based in gdt.c,
+ * depending on CONFIG_GDT_DYNAMIC
+ */
+extern tGdtHeader _gdt;
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _GDT_H */

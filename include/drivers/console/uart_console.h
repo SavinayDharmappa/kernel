@@ -25,9 +25,9 @@ extern "C" {
 
 #include <nanokernel.h>
 
-#define MAX_LINE_LEN 1024
+#define MAX_LINE_LEN 256
 struct uart_console_input {
-	int __unused;
+	int _unused;
 	char line[MAX_LINE_LEN];
 };
 
@@ -42,7 +42,7 @@ struct uart_console_input {
  *  @param lines nano_fifo queue of entered lines which to be processed
  *         in the application code.
  *
- *  @return None
+ *  @return N/A
  */
 void uart_register_input(struct nano_fifo *avail, struct nano_fifo *lines);
 

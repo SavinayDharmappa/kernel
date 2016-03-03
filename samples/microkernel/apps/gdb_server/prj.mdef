@@ -1,0 +1,5 @@
+% Application       : GDB Server demo
+
+% TASK NAME  PRIO ENTRY    STACK GROUPS
+% =====================================
+  TASK GDB      7 gdbStart  2048 [EXE]

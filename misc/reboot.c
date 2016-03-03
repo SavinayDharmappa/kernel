@@ -15,7 +15,7 @@
  */
 
 /**
- * @file common target reboot functionalities
+ * @file common target reboot functionality
  *
  * @details See misc/Kconfig and the reboot help for details.
  */
@@ -36,7 +36,7 @@ void sys_reboot(int type)
 
 	/* should never get here */
 	printk("Failed to reboot: spinning endlessly...\n");
-	for(;;) {
+	for (;;) {
 		nano_cpu_idle();
 	}
 }

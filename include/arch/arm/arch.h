@@ -1,5 +1,3 @@
-/* arch.h - ARM specific nanokernel interface header */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This header contains the ARM specific nanokernel interface.  It is
-included by the nanokernel interface architecture-abstraction header
-(nanokernel/cpu.h)
+/**
+ * @file
+ * @brief ARM specific nanokernel interface header
+ *
+ * This header contains the ARM specific nanokernel interface.  It is
+ * included by the nanokernel interface architecture-abstraction header
+ * (nanokernel/cpu.h)
  */
 
 #ifndef _ARM_ARCH__H_
@@ -50,6 +50,7 @@ extern "C" {
 #include <arch/arm/cortex_m/gdb_stub.h>
 #include <arch/arm/cortex_m/asm_inline.h>
 #include <arch/arm/cortex_m/addr_types.h>
+#include <arch/arm/cortex_m/sys_io.h>
 #endif
 
 #define STACK_ALIGN  4

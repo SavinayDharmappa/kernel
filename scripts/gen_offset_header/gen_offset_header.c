@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-/*
+/**
  * @file
  * @brief generate offset definition header file
  *
  * genOffsetHeader -i <objectModule> -o <outputHeaderName>
  *
- * This VxMicro development host utility will process an ELF object module that
+ * This Zephyr development host utility will process an ELF object module that
  * consists of a series of absolute symbols representing the byte offset of a
  * structure member and the size of the structure.  Each absolute symbol will
  * be translated into a C preprocessor '#define' directive.  For example,
@@ -83,7 +83,7 @@
 #define SWAB_Elf32_Off    SWAB_Elf32_Word
 #define SWAB_Elf32_Sword  SWAB_Elf32_Word
 
-#if defined(WINDOWS)
+#if defined(_WIN32) || defined(__CYGWIN32__) || defined(__WIN32__)
   #define OPEN_FLAGS (O_RDONLY|O_BINARY)
 #else
   #define OPEN_FLAGS (O_RDONLY)

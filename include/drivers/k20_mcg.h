@@ -1,5 +1,3 @@
-/* K20 Microprocessor MCG register definitions */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,15 +14,21 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module defines the Multipurpose Clock Generator (MCG) and Oscillator (OSC)
-registers for the K20 Family of microprocessors.
+/**
+ * @file
+ * @brief K20 Microprocessor MCG register definitions
+ *
+ * This module defines the Multipurpose Clock Generator (MCG) and Oscillator
+ * (OSC) registers for the K20 Family of microprocessors.
  */
 #ifndef _K20MCG_H_
 #define _K20MCG_H_
 
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* MCG - module register structure */
 typedef volatile struct
@@ -203,5 +207,9 @@ typedef union {
 
 /* Control register fields */
 #define OSC_CR_EXT_CLK_EN 0x80
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _K20MCG_H_ */

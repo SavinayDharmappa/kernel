@@ -39,6 +39,9 @@
  *
  * @brief Copy a packet
  *
+ * @param in the packet to be copied
+ * @param out the packet to copy to
+ *
  * @return N/A
  */
 static void copy_packet(struct k_args **out, struct k_args *in)
@@ -101,7 +104,7 @@ static int match(struct k_args *Reader, struct k_args *Writer)
 		__ASSERT_NO_MSG(Writer->args.m1.mess.size ==
 			Reader->args.m1.mess.size);
 
-		__ASSERT_NO_MSG((uint32_t)(-1) != Reader->args.m1.mess.size);
+		__ASSERT_NO_MSG(Reader->args.m1.mess.size != (uint32_t)(-1));
 
 		return Reader->args.m1.mess.size;
 	}
@@ -124,11 +127,11 @@ static bool prepare_transfer(struct k_args *move,
 	 * prepare writer and reader cmd packets for 'return':
 	 * (this is shared code, irrespective of the value of 'move')
 	 */
-	__ASSERT_NO_MSG(NULL == reader->next);
+	__ASSERT_NO_MSG(reader->next == NULL);
 	reader->Comm = _K_SVC_MBOX_RECEIVE_ACK;
 	reader->Time.rcode = RC_OK;
 
-	__ASSERT_NO_MSG(NULL == writer->next);
+	__ASSERT_NO_MSG(writer->next == NULL);
 	writer->alloc = true;
 
 	writer->Comm = _K_SVC_MBOX_SEND_ACK;
@@ -136,8 +139,8 @@ static bool prepare_transfer(struct k_args *move,
 
 	if (move) {
 		/* { move != NULL, which means full data exchange } */
-
 		bool all_data_present = true;
+
 		move->Comm = _K_SVC_MOVEDATA_REQ;
 		/*
 		 * transfer the data with the highest
@@ -175,7 +178,7 @@ static bool prepare_transfer(struct k_args *move,
 			reader->args.m1.mess.tx_block =
 				writer->args.m1.mess.tx_block;
 		} else {
-			__ASSERT_NO_MSG(NULL != writer->args.m1.mess.tx_data);
+			__ASSERT_NO_MSG(writer->args.m1.mess.tx_data != NULL);
 			move->args.moved_req.source =
 				writer->args.m1.mess.tx_data;
 			reader->args.m1.mess.tx_data =
@@ -185,10 +188,10 @@ static bool prepare_transfer(struct k_args *move,
 		move->args.moved_req.extra.setup.continuation_send = writer;
 
 		return all_data_present;
-	} else {
-		/* { NULL == move, which means header exchange only } */
-		return 0; /* == don't care actually */
 	}
+
+	/* { NULL == move, which means header exchange only } */
+	return 0; /* == don't care actually */
 }
 
 /**
@@ -198,8 +201,8 @@ static bool prepare_transfer(struct k_args *move,
  */
 static void transfer(struct k_args *pMvdReq)
 {
-	__ASSERT_NO_MSG(NULL != pMvdReq->args.moved_req.source);
-	__ASSERT_NO_MSG(NULL != pMvdReq->args.moved_req.destination);
+	__ASSERT_NO_MSG(pMvdReq->args.moved_req.source != NULL);
+	__ASSERT_NO_MSG(pMvdReq->args.moved_req.destination != NULL);
 
 	_k_movedata_request(pMvdReq);
 	FREEARGS(pMvdReq);
@@ -212,6 +215,8 @@ static void transfer(struct k_args *pMvdReq)
  */
 void _k_mbox_send_ack(struct k_args *pCopyWriter)
 {
+	struct k_args *Starter;
+
 	if (ISASYNCMSG(&(pCopyWriter->args.m1.mess))) {
 		if (pCopyWriter->args.m1.mess.extra.sema) {
 			/*
@@ -233,8 +238,7 @@ void _k_mbox_send_ack(struct k_args *pCopyWriter)
 		 * unless this an asynchronous transfer.
 		 */
 
-		if ((uint32_t)(-1) !=
-		    pCopyWriter->args.m1.mess.tx_block.pool_id) {
+		if (pCopyWriter->args.m1.mess.tx_block.pool_id != (uint32_t)(-1)) {
 			/*
 			 * special value to tell if block should be
 			 * freed or not
@@ -252,27 +256,25 @@ void _k_mbox_send_ack(struct k_args *pCopyWriter)
 				pCopyWriter->args.m1.mess.tx_block.req_size;
 			SENDARGS(pCopyWriter);
 			return;
-		} else {
-			FREEARGS(pCopyWriter);
-			return;
 		}
-	} else {
-		struct k_args *Starter;
-
-		/*
-		 * Get a pointer to the original command packet of the sender
-		 * and copy both the result as well as the message information
-		 * from the received packet of the sender before resetting the
-		 * TF_SEND and TF_SENDDATA state bits.
-		 */
-
-		Starter = pCopyWriter->Ctxt.args;
-		Starter->Time.rcode = pCopyWriter->Time.rcode;
-		Starter->args.m1.mess = pCopyWriter->args.m1.mess;
-		_k_state_bit_reset(Starter->Ctxt.task, TF_SEND | TF_SENDDATA);
 
 		FREEARGS(pCopyWriter);
+		return;
 	}
+
+	/*
+	 * Get a pointer to the original command packet of the sender
+	 * and copy both the result as well as the message information
+	 * from the received packet of the sender before resetting the
+	 * TF_SEND and TF_SENDDATA state bits.
+	 */
+
+	Starter = pCopyWriter->Ctxt.args;
+	Starter->Time.rcode = pCopyWriter->Time.rcode;
+	Starter->args.m1.mess = pCopyWriter->args.m1.mess;
+	_k_state_bit_reset(Starter->Ctxt.task, TF_SEND | TF_SENDDATA);
+
+	FREEARGS(pCopyWriter);
 }
 
 /**
@@ -347,7 +349,7 @@ void _k_mbox_send_request(struct k_args *Writer)
 
 		u32Size = match(CopyReader, CopyWriter);
 
-		if ((uint32_t)(-1) != u32Size) {
+		if (u32Size != (uint32_t)(-1)) {
 #ifdef CONFIG_OBJECT_MONITOR
 			MailBox->count++;
 #endif
@@ -375,7 +377,7 @@ void _k_mbox_send_request(struct k_args *Writer)
 			}
 #endif
 
-			if (0 == u32Size) {
+			if (u32Size == 0) {
 				/* No data exchange--header only */
 				prepare_transfer(NULL, CopyReader, CopyWriter);
 				SENDARGS(CopyReader);
@@ -448,30 +450,14 @@ void _k_mbox_send_request(struct k_args *Writer)
 	}
 }
 
-
-/**
- * @brief Send a message to a mailbox
- *
- * This routine sends a message to a mailbox and looks for a matching receiver.
- *
- * @param mbox mailbox
- * @param prio priority of data transfer
- * @param M pointer to message to send
- * @param time maximum number of ticks to wait
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-int _task_mbox_put(kmbox_t mbox,
-	       kpriority_t prio,
-	       struct k_msg *M,
-	       int32_t time)
+int task_mbox_put(kmbox_t mbox, kpriority_t prio, struct k_msg *M, int32_t timeout)
 {
 	struct k_args A;
 
-	__ASSERT((0 == M->size) || (NULL != M->tx_data),
+	__ASSERT((M->size == 0) || (M->tx_data != NULL),
 			 "Invalid mailbox data specification\n");
 
-	if (unlikely((uint32_t)(-1) == M->size)) {
+	if (unlikely(M->size == (uint32_t)(-1))) {
 		/* the sender side cannot specify a size of -1 == 0xfff..ff */
 		return RC_FAIL;
 	}
@@ -483,7 +469,7 @@ int _task_mbox_put(kmbox_t mbox,
 
 	A.priority = prio;
 	A.Comm = _K_SVC_MBOX_SEND_REQUEST;
-	A.Time.ticks = time;
+	A.Time.ticks = timeout;
 	A.args.m1.mess = *M;
 
 	KERNEL_ENTRY(&A);
@@ -570,7 +556,7 @@ void _k_mbox_receive_request(struct k_args *Reader)
 
 		u32Size = match(CopyReader, CopyWriter);
 
-		if ((uint32_t)(-1) != u32Size) {
+		if (u32Size != (uint32_t)(-1)) {
 #ifdef CONFIG_OBJECT_MONITOR
 			MailBox->count++;
 #endif
@@ -598,7 +584,7 @@ void _k_mbox_receive_request(struct k_args *Reader)
 			}
 #endif
 
-			if (0 == u32Size) {
+			if (u32Size == 0) {
 				/* No data exchange--header only */
 				prepare_transfer(NULL, CopyReader, CopyWriter);
 				SENDARGS(CopyReader);
@@ -663,9 +649,7 @@ void _k_mbox_receive_request(struct k_args *Reader)
 }
 
 
-int _task_mbox_get(kmbox_t mbox,
-	       struct k_msg *M,
-	       int32_t time)
+int task_mbox_get(kmbox_t mbox, struct k_msg *M, int32_t timeout)
 {
 	struct k_args A;
 
@@ -680,7 +664,7 @@ int _task_mbox_get(kmbox_t mbox,
 
 	A.priority = _k_current_task->priority;
 	A.Comm = _K_SVC_MBOX_RECEIVE_REQUEST;
-	A.Time.ticks = time;
+	A.Time.ticks = timeout;
 	A.args.m1.mess = *M;
 
 	KERNEL_ENTRY(&A);
@@ -698,7 +682,7 @@ void _task_mbox_block_put(kmbox_t mbox,
 
 	__ASSERT(0xFFFFFFFF != M->size, "Invalid mailbox data specification\n");
 
-	if (0 == M->size) {
+	if (M->size == 0) {
 		/*
 		 * trick: special value to indicate that tx_block
 		 * should NOT be released in the SND_ACK
@@ -770,7 +754,7 @@ void _task_mbox_data_get(struct k_msg *M)
 	struct k_args A;
 
 	/* sanity checks */
-	if (unlikely(NULL == M->extra.transfer)) {
+	if (unlikely(M->extra.transfer == NULL)) {
 		/*
 		 * protection: if a user erroneously calls this function after
 		 * a task_mbox_get(), we should not run into trouble
@@ -785,16 +769,14 @@ void _task_mbox_data_get(struct k_msg *M)
 }
 
 
-int _task_mbox_data_block_get(struct k_msg *message,
-			  struct k_block *rxblock,
-			  kmemory_pool_t pool_id,
-			  int32_t time)
+int task_mbox_data_block_get(struct k_msg *M, struct k_block *block,
+			  kmemory_pool_t pool_id, int32_t timeout)
 {
 	int retval;
 	struct k_args *MoveD;
 
 	/* sanity checks: */
-	if (NULL == message->extra.transfer) {
+	if (M->extra.transfer == NULL) {
 		/*
 		 * If a user erroneously calls this function after a
 		 * task_mbox_get(), we should not run into trouble.
@@ -806,13 +788,13 @@ int _task_mbox_data_block_get(struct k_msg *message,
 
 	/* special flow to check for possible optimisations: */
 
-	if (ISASYNCMSG(message)) {
+	if (ISASYNCMSG(M)) {
 		/* First transfer block */
-		__ASSERT_NO_MSG(-1 != message->tx_block.pool_id);
-		*rxblock = message->tx_block;
+		__ASSERT_NO_MSG(M->tx_block.pool_id != -1);
+		*block = M->tx_block;
 
 		/* This is the MOVED packet */
-		MoveD = message->extra.transfer;
+		MoveD = M->extra.transfer;
 
 		/* Then release sender (writer) */
 
@@ -827,8 +809,8 @@ int _task_mbox_data_block_get(struct k_msg *message,
 		 */
 
 		Writer = MoveD->args.moved_req.extra.setup.continuation_send;
-		__ASSERT_NO_MSG(NULL != Writer);
-		__ASSERT_NO_MSG(NULL == Writer->next);
+		__ASSERT_NO_MSG(Writer != NULL);
+		__ASSERT_NO_MSG(Writer->next == NULL);
 
 		Writer->args.m1.mess.tx_block.pool_id = (uint32_t)(-1);
 		nano_task_stack_push(&_k_command_stack, (uint32_t)Writer);
@@ -842,7 +824,7 @@ int _task_mbox_data_block_get(struct k_msg *message,
 		 */
 
 		dummy = MoveD->args.moved_req.extra.setup.continuation_receive;
-		__ASSERT_NO_MSG(NULL == dummy);
+		__ASSERT_NO_MSG(dummy == NULL);
 #endif
 
 		FREEARGS(MoveD); /* Clean up MOVED */
@@ -852,15 +834,15 @@ int _task_mbox_data_block_get(struct k_msg *message,
 
 	/* 'normal' flow of task_mbox_data_block_get(): */
 
-	if (0 != message->size) {
-		retval = _task_mem_pool_alloc(rxblock, pool_id,
-					message->size, time);
+	if (M->size != 0) {
+		retval = task_mem_pool_alloc(block, pool_id,
+					M->size, timeout);
 		if (retval != RC_OK) {
 			return retval;
 		}
-		message->rx_data = rxblock->pointer_to_data;
+		M->rx_data = block->pointer_to_data;
 	} else {
-		rxblock->pool_id = (kmemory_pool_t) -1;
+		block->pool_id = (kmemory_pool_t) -1;
 	}
 
 	/*
@@ -869,7 +851,8 @@ int _task_mbox_data_block_get(struct k_msg *message,
 	 */
 
 	struct k_args A;
-	A.args.m1.mess = *message;
+
+	A.args.m1.mess = *M;
 	A.Comm = _K_SVC_MBOX_RECEIVE_DATA;
 	KERNEL_ENTRY(&A);
 

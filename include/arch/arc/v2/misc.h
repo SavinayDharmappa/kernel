@@ -1,5 +1,3 @@
-/* arc/v2/misc.h - ARCv2 public nanokernel miscellaneous */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,18 +14,28 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-ARC-specific nanokernel miscellaneous interface. Included by arc/arch.h.
+/**
+ * @file
+ * @brief ARCv2 public nanokernel miscellaneous
+ *
+ * ARC-specific nanokernel miscellaneous interface. Included by arc/arch.h.
  */
 
 #ifndef _ARCH_ARC_V2_MISC_H_
 #define _ARCH_ARC_V2_MISC_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _ASMLANGUAGE
 extern unsigned int nano_cpu_sleep_mode;
 extern void nano_cpu_idle(void);
 extern void nano_cpu_atomic_idle(unsigned int key);
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* _ARCH_ARC_V2_MISC_H_ */

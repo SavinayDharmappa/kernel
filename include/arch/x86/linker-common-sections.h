@@ -1,5 +1,3 @@
-/* linker-common-sections.h - common linker sections */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,34 +14,37 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This script defines the memory location of the various sections that make up
-a Zephyr Kernel image. This file is used by the linker.
-
-This script places the various sections of the image according to what features
-are enabled by the kernel's configuration options.
-
-For a build that does not use the execute in place (XIP) feature, the script
-generates an image suitable for loading into and executing from RAM by placing
-all the sections adjacent to each other.  There is also no separate load
-address for the DATA section which means it doesn't have to be copied into RAM.
-
-For builds using XIP, there is a different load memory address (LMA) and
-virtual memory address (VMA) for the DATA section.  In this case the DATA
-section is copied into RAM at runtime.
-
-When building an XIP image the data section is placed into ROM.  In this case,
-the LMA is set to __data_rom_start so the data section is concatenated at the
-end of the RODATA section.  At runtime, the DATA section is copied into the RAM
-region so it can be accessed with read and write permission.
-
-Most symbols defined in the sections below are subject to be referenced in the
-Zephyr Kernel image. If a symbol is used but not defined the linker will emit an
-undefined symbol error.
-
-Please do not change the order of the section as the nanokernel expects this
-order when programming the MMU.
+/**
+ * @file
+ * @brief Common linker sections
+ *
+ * This script defines the memory location of the various sections that make up
+ * a Zephyr Kernel image. This file is used by the linker.
+ *
+ * This script places the various sections of the image according to what
+ * features are enabled by the kernel's configuration options.
+ *
+ * For a build that does not use the execute in place (XIP) feature, the script
+ * generates an image suitable for loading into and executing from RAM by
+ * placing all the sections adjacent to each other.  There is also no separate
+ * load address for the DATA section which means it doesn't have to be copied
+ * into RAM.
+ *
+ * For builds using XIP, there is a different load memory address (LMA) and
+ * virtual memory address (VMA) for the DATA section.  In this case the DATA
+ * section is copied into RAM at runtime.
+ *
+ * When building an XIP image the data section is placed into ROM.  In this
+ * case, the LMA is set to __data_rom_start so the data section is concatenated
+ * at the end of the RODATA section.  At runtime, the DATA section is copied
+ * into the RAM region so it can be accessed with read and write permission.
+ *
+ * Most symbols defined in the sections below are subject to be referenced in
+ * the Zephyr Kernel image. If a symbol is used but not defined the linker will
+ * emit an undefined symbol error.
+ *
+ * Please do not change the order of the section as the nanokernel expects this
+ * order when programming the MMU.
  */
 
 #define _LINKER
@@ -52,14 +53,11 @@ order when programming the MMU.
 #include <linker-defs.h>
 #include <offsets.h>
 #include <misc/util.h>
+#include <arch/cpu.h>
 
 #define MMU_PAGE_SIZE KB(4)
 
 #include <linker-tool.h>
-
-#define INIT_LEVEL(level)				\
-		__initconfig##level##_start = .;	\
-		*(.initconfig##level##.init)		\
 
 /* SECTIONS definitions */
 SECTIONS
@@ -76,6 +74,7 @@ SECTIONS
 	*(".text_start.*")
 	*(.text)
 	*(".text.*")
+	*(.gnu.linkonce.t.*)
 	*(.eh_frame)
 	*(.init)
 	*(.fini)
@@ -85,12 +84,13 @@ SECTIONS
 
 	_image_text_end = .;
 
-	SECTION_PROLOGUE(_CTOR_SECTION_NAME, (OPTIONAL),)
+#ifdef CONFIG_CPLUSPLUS
+	SECTION_PROLOGUE(_CTOR_SECTION_NAME, ,)
 	{
 	/*
 	 * The compiler fills the constructor pointers table below, hence symbol
 	 * __CTOR_LIST__ must be aligned on 4 byte boundary.
-	 * To align with the C++ standard, the first element of the array
+	 * To align with the C++ standard, the first elment of the array
 	 * contains the number of actual constructors. The last element is
 	 * NULL.
 	 */
@@ -100,10 +100,18 @@ SECTIONS
 	KEEP(*(SORT_BY_NAME(".ctors*")))
 	LONG(0)
 	__CTOR_END__ = .;
-	KEXEC_PGALIGN_PAD(MMU_PAGE_SIZE)
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
-	SECTION_PROLOGUE (devconfig, (OPTIONAL),)
+	SECTION_PROLOGUE(init_array, (OPTIONAL),)
+	{
+	. = ALIGN(4);
+	__init_array_start = .;
+	KEEP(*(SORT_BY_NAME(".init_array*")))
+	__init_array_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+#endif
+
+	SECTION_PROLOGUE(devconfig, (OPTIONAL),)
 	{
 		__devconfig_start = .;
 		*(".devconfig.*")
@@ -115,7 +123,13 @@ SECTIONS
 	{
 	*(.rodata)
 	*(".rodata.*")
+	*(.gnu.linkonce.r.*)
+#if ALL_DYN_STUBS == 0
+	IDT_MEMORY
+#endif
+#ifndef CONFIG_MVIC
 	IRQ_TO_INTERRUPT_VECTOR_MEMORY
+#endif
 	KEXEC_PGALIGN_PAD(MMU_PAGE_SIZE)
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
@@ -128,7 +142,7 @@ SECTIONS
 	GROUP_START(RAM)
 
 #if defined(CONFIG_XIP)
-	SECTION_AT_PROLOGUE(_DATA_SECTION_NAME, (OPTIONAL),,__data_rom_start)
+	SECTION_AT_PROLOGUE(_DATA_SECTION_NAME, (OPTIONAL), , __data_rom_start)
 #else
 	SECTION_PROLOGUE(_DATA_SECTION_NAME, (OPTIONAL),)
 #endif
@@ -138,28 +152,22 @@ SECTIONS
 	__data_ram_start = .;
 	*(.data)
 	*(".data.*")
+#if ALL_DYN_STUBS > 0
 	IDT_MEMORY
+#endif
+#if ALL_DYN_IRQ_STUBS > 0
 	INTERRUPT_VECTORS_ALLOCATED_MEMORY
+#endif
 	. = ALIGN(4);
 	} GROUP_LINK_IN(RAM)
 
-	SECTION_PROLOGUE (initlevel, (OPTIONAL),)
+	SECTION_PROLOGUE(initlevel, (OPTIONAL),)
 	{
-		__initconfig_start = .;
-		INIT_LEVEL(0)
-		INIT_LEVEL(1)
-		INIT_LEVEL(2)
-		INIT_LEVEL(3)
-		INIT_LEVEL(4)
-		INIT_LEVEL(5)
-		INIT_LEVEL(6)
-		INIT_LEVEL(7)
-		KEEP(*(SORT_BY_NAME(".initconfig*")))
-		__initconfig_end = .;
+		DEVICE_INIT_SECTIONS()
 		KEXEC_PGALIGN_PAD(MMU_PAGE_SIZE)
 	} GROUP_LINK_IN(RAM)
 
-	SECTION_PROLOGUE (_k_task_list, ALIGN(4), ALIGN(4))
+	SECTION_PROLOGUE(_k_task_list, ALIGN(4), ALIGN(4))
 	{
 		_k_task_list_start = .;
 			*(._k_task_list.public.*)
@@ -170,7 +178,7 @@ SECTIONS
 		_k_task_list_end = .;
 	} GROUP_LINK_IN(RAM)
 
-	SECTION_PROLOGUE (_k_task_ptr, (OPTIONAL),)
+	SECTION_PROLOGUE(_k_task_ptr, (OPTIONAL),)
 	{
 		_k_task_ptr_start = .;
 			*(._k_task_ptr.public.*)
@@ -180,7 +188,7 @@ SECTIONS
 		_k_task_ptr_end = .;
 	} GROUP_LINK_IN(RAM)
 
-	SECTION_PROLOGUE (_k_pipe_ptr, (OPTIONAL),)
+	SECTION_PROLOGUE(_k_pipe_ptr, (OPTIONAL),)
 	{
 		_k_pipe_ptr_start = .;
 			*(._k_pipe_ptr.public.*)
@@ -189,13 +197,21 @@ SECTIONS
 		_k_pipe_ptr_end = .;
 	} GROUP_LINK_IN(RAM)
 
-	SECTION_PROLOGUE (_k_mem_map_ptr, (OPTIONAL),)
+	SECTION_PROLOGUE(_k_mem_map_ptr, (OPTIONAL),)
 	{
 		_k_mem_map_ptr_start = .;
 			*(._k_mem_map_ptr.public.*)
 			*(._k_mem_map_ptr.private.*)
 		KEEP(*(SORT_BY_NAME("._k_mem_map_ptr*")))
 		_k_mem_map_ptr_end = .;
+	} GROUP_LINK_IN(RAM)
+
+	SECTION_PROLOGUE(_k_event_list, (OPTIONAL),)
+	{
+		_k_event_list_start = .;
+			*(._k_event_list.event.*)
+		KEEP(*(SORT_BY_NAME("._k_event_list*")))
+		_k_event_list_end = .;
 	} GROUP_LINK_IN(RAM)
 
 	__data_ram_end = .;
@@ -263,6 +279,13 @@ SECTIONS
 	KEEP(*(.intList))
 	__INT_LIST_END__ = .;
 	} > IDT_LIST
+
+	/* verify we don't have rogue .init_<something> initlevel sections */
+	SECTION_PROLOGUE(initlevel_error, (OPTIONAL), )
+	{
+		DEVICE_INIT_UNDEFINED_SECTION()
+	}
+	ASSERT(SIZEOF(initlevel_error) == 0, "Undefined initialization levels used.")
 
 	}
 

@@ -1,5 +1,3 @@
-/* toolchain/common.h - common toolchain abstraction */
-
 /*
  * Copyright (c) 2010-2014 Wind River Systems, Inc.
  *
@@ -16,12 +14,25 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Macros to abstract compiler capabilities (common to all toolchains).
-
-\NOMANUAL
+/**
+ * @file
+ * @brief Common toolchain abstraction
+ *
+ * Macros to abstract compiler capabilities (common to all toolchains).
  */
+
+/* Abstract use of extern keyword for compatibility between C and C++ */
+#ifdef __cplusplus
+#define EXTERN_C extern "C"
+#else
+#define EXTERN_C extern
+#endif
+
+/* Use TASK_ENTRY_CPP to tag task entry points defined in C++ files. */
+
+#ifdef __cplusplus
+#define TASK_ENTRY_CPP  extern "C"
+#endif
 
 /*
  * Generate a reference to an external symbol.
@@ -71,7 +82,7 @@ Macros to abstract compiler capabilities (common to all toolchains).
 
 #ifdef _ASMLANGUAGE
 
-  #ifdef CONFIG_X86_32
+  #ifdef CONFIG_X86
 
     #ifdef PERF_OPT
       #define PERFOPT_ALIGN .balign 16
@@ -95,7 +106,7 @@ Macros to abstract compiler capabilities (common to all toolchains).
 
   #define GC_SECTION(sym) SECTION .text.FUNC(sym), "ax"
 
-  #define BRANCH_LABEL(sym) FUNC(sym):
+  #define BRANCH_LABEL(sym) FUNC(sym) :
   #define VAR(sym)          FUNC(sym)
 
 #endif /* _ASMLANGUAGE */
@@ -107,13 +118,12 @@ Macros to abstract compiler capabilities (common to all toolchains).
 #endif
 
 #define _STRINGIFY(x) #x
+#define STRINGIFY(s) _STRINGIFY(s)
 
 /* Indicate that an array will be used for stack space. */
 
 #define __stack __aligned(STACK_ALIGN)
 
-#ifdef CONFIG_UNALIGNED_WRITE_UNSUPPORTED
-extern void     _Unaligned32Write(unsigned int *ptr, unsigned int val);
-extern unsigned _Unaligned32Read(unsigned int *ptr);
-#endif /* CONFIG_UNALIGNED_WRITE_UNSUPPORTED */
-
+/* concatenate the values of the arguments into one */
+#define _DO_CONCAT(x, y) x ## y
+#define _CONCAT(x, y) _DO_CONCAT(x, y)

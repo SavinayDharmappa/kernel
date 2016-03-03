@@ -23,24 +23,29 @@
 #include <wait_q.h>
 #include <drivers/system_timer.h>
 
-#ifdef CONFIG_NANOKERNEL
-
 #ifdef CONFIG_SYS_CLOCK_EXISTS
 int sys_clock_us_per_tick = 1000000 / sys_clock_ticks_per_sec;
 int sys_clock_hw_cycles_per_tick =
-	sys_clock_hw_cycles_per_sec / sys_clock_ticks_per_sec;
+	CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC / sys_clock_ticks_per_sec;
+#if defined(CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME)
+int sys_clock_hw_cycles_per_sec = CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC;
+#endif
 #else
 /* don't initialize to avoid division-by-zero error */
 int sys_clock_us_per_tick;
 int sys_clock_hw_cycles_per_tick;
+#if defined(CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME)
+int sys_clock_hw_cycles_per_sec;
+#endif
 #endif
 
+#ifdef CONFIG_NANOKERNEL
 
 /* updated by timer driver for tickless, stays at 1 for non-tickless */
-uint32_t _sys_idle_elapsed_ticks = 1;
+int32_t _sys_idle_elapsed_ticks = 1;
 #endif /*  CONFIG_NANOKERNEL */
 
-int64_t _nano_ticks = 0;
+int64_t _sys_clock_tick_count;
 
 /**
  *
@@ -49,9 +54,9 @@ int64_t _nano_ticks = 0;
  * @return the current system tick count
  *
  */
-uint32_t nano_tick_get_32(void)
+uint32_t sys_tick_get_32(void)
 {
-	return (uint32_t)_nano_ticks;
+	return (uint32_t)_sys_clock_tick_count;
 }
 
 /**
@@ -61,19 +66,20 @@ uint32_t nano_tick_get_32(void)
  * @return the current system tick count
  *
  */
-int64_t nano_tick_get(void)
+int64_t sys_tick_get(void)
 {
-	int64_t tmp_nano_ticks;
+	int64_t tmp_sys_clock_tick_count;
 	/*
-	 * Lock the interrupts when reading _nano_ticks 64-bit variable.
+	 * Lock the interrupts when reading _sys_clock_tick_count 64-bit variable.
 	 * Some architectures (x86) do not handle 64-bit atomically, so
 	 * we have to lock the timer interrupt that causes change of
-	 * _nano_ticks
+	 * _sys_clock_tick_count
 	 */
 	unsigned int imask = irq_lock();
-	tmp_nano_ticks = _nano_ticks;
+
+	tmp_sys_clock_tick_count = _sys_clock_tick_count;
 	irq_unlock(imask);
-	return tmp_nano_ticks;
+	return tmp_sys_clock_tick_count;
 }
 
 /**
@@ -87,37 +93,37 @@ int64_t nano_tick_get(void)
  * tick count is the return value. Since the first call is meant to only fill in
  * the reference time, its return value should be discarded.
  *
- * Since a code fragment that wants to use nano_tick_delta passes in its
+ * Since a code fragment that wants to use sys_tick_delta() passes in its
  * own reference time variable, multiple code fragments can make use of this
  * function concurrently.
  *
  * e.g.
  * uint64_t  reftime;
- * (void) nano_tick_delta(&reftime);  /# prime it #/
+ * (void) sys_tick_delta(&reftime);  /# prime it #/
  * [do stuff]
- * x = nano_tick_delta(&reftime);     /# how long since priming #/
+ * x = sys_tick_delta(&reftime);     /# how long since priming #/
  * [do more stuff]
- * y = nano_tick_delta(&reftime);     /# how long since [do stuff] #/
+ * y = sys_tick_delta(&reftime);     /# how long since [do stuff] #/
  *
  * @return tick count since reference time; undefined for first invocation
  *
  * NOTE: We use inline function for both 64-bit and 32-bit functions.
  * Compiler optimizes out 64-bit result handling in 32-bit version.
  */
-
 static ALWAYS_INLINE int64_t _nano_tick_delta(int64_t *reftime)
 {
 	int64_t  delta;
 	int64_t  saved;
 
 	/*
-	 * Lock the interrupts when reading _nano_ticks 64-bit variable.
+	 * Lock the interrupts when reading _sys_clock_tick_count 64-bit variable.
 	 * Some architectures (x86) do not handle 64-bit atomically, so
 	 * we have to lock the timer interrupt that causes change of
-	 * _nano_ticks
+	 * _sys_clock_tick_count
 	 */
 	unsigned int imask = irq_lock();
-	saved = _nano_ticks;
+
+	saved = _sys_clock_tick_count;
 	irq_unlock(imask);
 	delta = saved - (*reftime);
 	*reftime = saved;
@@ -131,13 +137,13 @@ static ALWAYS_INLINE int64_t _nano_tick_delta(int64_t *reftime)
  *
  * @return tick count since reference time; undefined for first invocation
  */
-int64_t nano_tick_delta(int64_t *reftime)
+int64_t sys_tick_delta(int64_t *reftime)
 {
 	return _nano_tick_delta(reftime);
 }
 
 
-uint32_t nano_tick_delta_32(int64_t *reftime)
+uint32_t sys_tick_delta_32(int64_t *reftime)
 {
 	return (uint32_t)_nano_tick_delta(reftime);
 }
@@ -147,18 +153,19 @@ uint32_t nano_tick_delta_32(int64_t *reftime)
 #ifdef CONFIG_NANO_TIMEOUTS
 #include <wait_q.h>
 
-static inline void handle_expired_nano_timeouts(int ticks)
+static inline void handle_expired_nano_timeouts(int32_t ticks)
 {
 	struct _nano_timeout *head =
 		(struct _nano_timeout *)sys_dlist_peek_head(&_nanokernel.timeout_q);
 
+	_nanokernel.task_timeout = TICKS_UNLIMITED;
 	if (head) {
 		head->delta_ticks_from_prev -= ticks;
 		_nano_timeout_handle_timeouts();
 	}
 }
 #else
-	#define handle_expired_nano_timeouts(ticks) do { } while((0))
+	#define handle_expired_nano_timeouts(ticks) do { } while ((0))
 #endif
 
 /* handle the expired nano timers in the nano timers queue */
@@ -172,16 +179,16 @@ static inline void handle_expired_nano_timers(int ticks)
 		while (_nano_timer_list && (!_nano_timer_list->ticks)) {
 			struct nano_timer *expired = _nano_timer_list;
 			struct nano_lifo *lifo = &expired->lifo;
+
 			_nano_timer_list = expired->link;
 			nano_isr_lifo_put(lifo, expired->userData);
 		}
 	}
 }
 #else
-	#define handle_expired_nano_timers(ticks) do { } while((0))
+	#define handle_expired_nano_timers(ticks) do { } while ((0))
 #endif
 
-#if defined(CONFIG_NANO_TIMEOUTS) || defined(CONFIG_NANO_TIMERS)
 /**
  *
  * @brief Announce a tick to the nanokernel
@@ -192,14 +199,16 @@ static inline void handle_expired_nano_timers(int ticks)
  *
  * @return N/A
  */
-
-void _nano_sys_clock_tick_announce(uint32_t ticks)
+void _nano_sys_clock_tick_announce(int32_t ticks)
 {
-	_nano_ticks += ticks;
-	handle_expired_nano_timeouts((int)ticks);
-	handle_expired_nano_timers((int)ticks);
+	unsigned int  key;
+
+	key = irq_lock();
+	_sys_clock_tick_count += ticks;
+	handle_expired_nano_timeouts(ticks);
+	handle_expired_nano_timers(ticks);
+	irq_unlock(key);
 }
-#endif
 
 /* get closest nano timers deadline expiry, (uint32_t)TICKS_UNLIMITED if none */
 #ifdef CONFIG_NANO_TIMERS

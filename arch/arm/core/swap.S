@@ -1,5 +1,3 @@
-/* swap.S - thread context switching for ARM Cortex-M */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements the routines necessary for thread context switching
-on ARM Cortex-M3/M4 CPUs.
+/**
+ * @file
+ * @brief Thread context switching for ARM Cortex-M
+ *
+ * This module implements the routines necessary for thread context switching
+ * on ARM Cortex-M3/M4 CPUs.
  */
 
 #define _ASMLANGUAGE
@@ -58,10 +58,10 @@ SECTION_FUNC(TEXT, __pendsv)
 
     _GDB_STUB_EXC_ENTRY
 
-#ifdef CONFIG_PROFILER_CONTEXT_SWITCH
+#ifdef CONFIG_KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
 	/* Register the context switch */
 	push {lr}
-	bl _sys_profiler_context_switch
+	bl _sys_k_event_logger_context_switch
 	pop {lr}
 #endif
 
@@ -133,7 +133,7 @@ SECTION_FUNC(TEXT, __pendsv)
     ldmia r0, {v1-v8, ip}
     msr PSP, ip
 
-    _GDB_STUB_PENDSV_EXIT
+    _GDB_STUB_EXC_EXIT
 
     /* exc return */
     bx lr
@@ -151,6 +151,33 @@ SECTION_FUNC(TEXT, __pendsv)
 SECTION_FUNC(TEXT, __svc)
 
     _GDB_STUB_EXC_ENTRY
+
+#if CONFIG_IRQ_OFFLOAD
+    tst lr, #0x4    /* did we come from thread mode ? */
+    ite eq  /* if zero (equal), came from handler mode */
+        mrseq r0, MSP   /* handler mode, stack frame is on MSP */
+        mrsne r0, PSP   /* thread mode, stack frame is on PSP */
+
+    ldr r0, [r0, #24]   /* grab address of PC from stack frame */
+    /* SVC is a two-byte instruction, point to it and read  encoding */
+    ldr r0, [r0, #-2]
+
+   /*
+    * grab service call number: if zero, it's a context switch;  if not,
+    * it's an irq offload
+    */
+    ands r0, #0xff
+    beq _context_switch
+
+    push {lr}
+    blx _irq_do_offload  /* call C routine which executes the offload */
+    pop {lr}
+
+    /* exception return is done in _IntExit(), including _GDB_STUB_EXC_EXIT */
+    b _IntExit
+
+BRANCH_LABEL(_context_switch);
+#endif
 
     /*
      * Unlock interrupts:

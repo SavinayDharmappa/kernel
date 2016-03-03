@@ -1,11 +1,17 @@
-VERSION_MAJOR 	   = 0
-VERSION_MINOR 	   = 5
+VERSION_MAJOR 	   = 1
+VERSION_MINOR 	   = 0
 PATCHLEVEL 	   = 0
 VERSION_RESERVED   = 0
 EXTRAVERSION       =
 NAME 		   = Zephyr Kernel
 
-export SOURCE_DIR PROJECT MDEF_FILE KLIBC_DIR
+export SOURCE_DIR PROJECT MDEF_FILE
+
+ifneq ($(MAKECMDGOALS),help)
+ifeq ($(PROJECT),)
+$(error Invoking make from top-level kernel directory is not supported)
+endif
+endif
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -18,6 +24,18 @@ export SOURCE_DIR PROJECT MDEF_FILE KLIBC_DIR
 #   (this increases performance and avoids hard-to-debug behaviour);
 # o Look for make include files relative to root of kernel src
 MAKEFLAGS += -rR --include-dir=$(CURDIR)
+
+UNAME := $(shell uname)
+ifeq (MINGW, $(findstring MINGW, $(UNAME)))
+HOST_OS=MINGW
+PWD_OPT=-W
+DISABLE_TRYRUN=y
+else ifeq (Linux, $(findstring Linux, $(UNAME)))
+HOST_OS=Linux
+else ifeq (Darwin, $(findstring Darwin, $(UNAME)))
+HOST_OS=Darwin
+endif
+export HOST_OS
 
 # Avoid funny character set dependencies
 unexport LC_ALL
@@ -140,7 +158,7 @@ ifneq ($(KBUILD_OUTPUT),)
 # check that the output directory actually exists
 saved-output := $(KBUILD_OUTPUT)
 KBUILD_OUTPUT := $(shell mkdir -p $(KBUILD_OUTPUT) && cd $(KBUILD_OUTPUT) \
-								&& /bin/pwd)
+								&& pwd $(PWD_OPT))
 $(if $(KBUILD_OUTPUT),, \
      $(error failed to create output directory "$(saved-output)"))
 
@@ -239,42 +257,6 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 ARCH		?= $(SUBARCH)
 CROSS_COMPILE	?= $(CONFIG_CROSS_COMPILE:"%"=%)
 
-# Architecture as present in compile.h
-UTS_MACHINE 	:= $(ARCH)
-SRCARCH 	:= $(ARCH)
-
-# Additional ARCH settings for x86
-ifeq ($(ARCH),i386)
-        SRCARCH := x86
-endif
-ifeq ($(ARCH),x86_64)
-        SRCARCH := x86
-endif
-
-# Additional ARCH settings for sparc
-ifeq ($(ARCH),sparc32)
-       SRCARCH := sparc
-endif
-ifeq ($(ARCH),sparc64)
-       SRCARCH := sparc
-endif
-
-# Additional ARCH settings for sh
-ifeq ($(ARCH),sh64)
-       SRCARCH := sh
-endif
-
-# Additional ARCH settings for tile
-ifeq ($(ARCH),tilepro)
-       SRCARCH := tile
-endif
-ifeq ($(ARCH),tilegx)
-       SRCARCH := tile
-endif
-
-# Where to locate arch specific headers
-hdr-arch  := $(SRCARCH)
-
 KCONFIG_CONFIG	?= .config
 export KCONFIG_CONFIG
 
@@ -296,11 +278,9 @@ endif
 # Decide whether to build built-in, modular, or both.
 # Normally, just do built-in.
 
-KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
 
-
-export KBUILD_MODULES KBUILD_BUILTIN
+export KBUILD_BUILTIN
 export KBUILD_CHECKSRC KBUILD_SRC
 
 ifneq ($(CC),)
@@ -327,8 +307,10 @@ AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
 ifeq ($(USE_CCACHE),1)
 CC		= $(CCACHE) $(CROSS_COMPILE)gcc
+CXX		= $(CCACHE) $(CROSS_COMPILE)g++
 else
 CC		= $(CROSS_COMPILE)gcc
+CXX		= $(CROSS_COMPILE)g++
 endif
 CPP		= $(CC) -E
 AR		= $(CROSS_COMPILE)ar
@@ -336,8 +318,8 @@ NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
 OBJDUMP		= $(CROSS_COMPILE)objdump
+GDB		= $(CROSS_COMPILE)gdb
 AWK		= awk
-GENKSYMS	= scripts/genksyms/genksyms
 GENIDT		= scripts/gen_idt/gen_idt
 GENOFFSET_H	= scripts/gen_offset_header/gen_offset_header
 PERL		= perl
@@ -345,66 +327,86 @@ PYTHON		= python
 CHECK		= sparse
 
 CHECKFLAGS     := -Wbitwise -Wno-return-void $(CF)
-CFLAGS_MODULE   =
-AFLAGS_MODULE   =
-LDFLAGS_MODULE  =
-CFLAGS_KERNEL	=
-AFLAGS_KERNEL	=
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
+ifeq ($(COMPILER),clang)
+ifneq ($(CROSS_COMPILE),)
+CLANG_TARGET    := -target $(notdir $(CROSS_COMPILE:%-=%))
+GCC_TOOLCHAIN   := $(dir $(CROSS_COMPILE))
+endif
+ifneq ($(GCC_TOOLCHAIN),)
+CLANG_GCC_TC    := -gcc-toolchain $(GCC_TOOLCHAIN)
+endif
+ifneq ($(IA),1)
+CLANG_IA_FLAG   = -no-integrated-as
+endif
+CLANG_FLAGS     := $(CLANG_TARGET) $(CLANG_GCC_TC) $(CLANG_IA_FLAG)
+endif
 
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE    := -include $(CURDIR)/include/generated/autoconf.h
-PROJECTINCLUDE := $(strip -I$(srctree)/include/microkernel \
-		-I$(CURDIR)/misc/generated/sysgen) \
-		$(USERINCLUDE)
 
+SOC_NAME = $(subst $(DQUOTE),,$(CONFIG_SOC))
+override ARCH = $(subst $(DQUOTE),,$(CONFIG_ARCH))
+BOARD_NAME = $(subst $(DQUOTE),,$(CONFIG_BOARD))
+KERNEL_NAME = $(subst $(DQUOTE),,$(CONFIG_KERNEL_BIN_NAME))
+KERNEL_ELF_NAME = $(KERNEL_NAME).elf
+KERNEL_BIN_NAME = $(KERNEL_NAME).bin
+
+export SOC_NAME BOARD_NAME ARCH KERNEL_NAME KERNEL_ELF_NAME KERNEL_BIN_NAME
 # Use ZEPHYRINCLUDE when you must reference the include/ directory.
 # Needed to be compatible with the O= option
-ZEPHYRINCLUDE    := \
-		-I$(srctree)/arch/$(hdr-arch)/include \
+ZEPHYRINCLUDE    = \
+		-I$(srctree)/arch/$(ARCH)/include \
+		-I$(srctree)/arch/$(ARCH)/soc/$(SOC_NAME) \
+		-I$(srctree)/boards/$(BOARD_NAME) \
 		$(if $(KBUILD_SRC), -I$(srctree)/include) \
 		-I$(srctree)/include \
 		-I$(CURDIR)/include/generated \
+		-I$(CURDIR)/misc/generated/sysgen \
 		$(USERINCLUDE) \
 		$(STDINCLUDE)
 
 KBUILD_CPPFLAGS := -DKERNEL
 
 KBUILD_CFLAGS   := -c -g -std=c99 \
-		-fno-reorder-functions \
 		-fno-asynchronous-unwind-tables \
 		-fno-omit-frame-pointer \
-		-fno-defer-pop -Wall \
-		-Wno-unused-but-set-variable \
+		-Wall \
 		-Wno-format-zero-length \
 		-Wno-main -ffreestanding
 
-KBUILD_AFLAGS_KERNEL :=
-KBUILD_CFLAGS_KERNEL :=
+KBUILD_CXXFLAGS   := -c -g -std=c++11 \
+		-fno-reorder-functions \
+		-fno-asynchronous-unwind-tables \
+		-fno-omit-frame-pointer \
+		-fcheck-new \
+		-fno-defer-pop -Wall \
+		-Wno-unused-but-set-variable \
+		-Wno-format-zero-length \
+		-Wno-main -ffreestanding \
+		-ffunction-sections -fdata-sections \
+		-fno-rtti -fno-exceptions
+
 KBUILD_AFLAGS   := -c -g -xassembler-with-cpp
 
 LDFLAGS += $(call ld-option,-nostartfiles)
 LDFLAGS += $(call ld-option,-nodefaultlibs)
 LDFLAGS += $(call ld-option,-nostdlib)
 LDFLAGS += $(call ld-option,-static)
-LDLIBS_TOOLCHAIN ?= -lgcc
 
 KERNELVERSION = $(VERSION_MAJOR)$(if $(VERSION_MINOR),.$(VERSION_MINOR)$(if $(PATCHLEVEL),.$(PATCHLEVEL)))$(EXTRAVERSION)
 
 export VERSION_MAJOR VERSION_MINOR PATCHLEVEL VERSION_RESERVED EXTRAVERSION
 export KERNELRELEASE KERNELVERSION
-export ARCH SRCARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
-export CPP AR NM STRIP OBJCOPY OBJDUMP
-export MAKE AWK GENKSYMS INSTALLKERNEL PERL PYTHON UTS_MACHINE GENIDT GENOFFSET_H
-export HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
+export ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC CXX
+export CPP AR NM STRIP OBJCOPY OBJDUMP GDB
+export MAKE AWK INSTALLKERNEL PERL PYTHON GENIDT GENOFFSET_H
+export HOSTCXX HOSTCXXFLAGS CHECK CHECKFLAGS
 
 export KBUILD_CPPFLAGS NOSTDINC_FLAGS ZEPHYRINCLUDE OBJCOPYFLAGS LDFLAGS
-export KBUILD_CFLAGS CFLAGS_KERNEL CFLAGS_MODULE CFLAGS_GCOV
-export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
-export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_LDFLAGS_MODULE
-export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL
-export KBUILD_ARFLAGS PROJECTINCLUDE LDLIBS_TOOLCHAIN
+export KBUILD_CFLAGS KBUILD_CXXFLAGS CFLAGS_GCOV KBUILD_AFLAGS AFLAGS_KERNEL
+export KBUILD_ARFLAGS
 
 
 # Files to ignore in find ... statements
@@ -424,7 +426,6 @@ scripts_basic:
 	$(Q)$(MAKE) $(build)=scripts/basic
 	$(Q)$(MAKE) $(build)=scripts/gen_idt
 	$(Q)$(MAKE) $(build)=scripts/gen_offset_header
-	$(Q)rm -f .tmp_quiet_recordmcount
 
 # To avoid any implicit rule to kick in, define an empty command.
 scripts/basic/%: scripts_basic ;
@@ -435,18 +436,9 @@ PHONY += outputmakefile
 # output directory.
 outputmakefile:
 ifneq ($(KBUILD_SRC),)
-	$(Q)ln -fsn $(srctree) source
 	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile \
 	    $(srctree) $(objtree) $(VERSION_MAJOR) $(VERSION_MINOR)
 endif
-
-# Support for using generic headers in asm-generic
-PHONY += asm-generic
-asm-generic:
-	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
-	            src=asm obj=arch/$(SRCARCH)/include/generated/asm
-	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.asm-generic \
-	            src=uapi/asm obj=arch/$(SRCARCH)/include/generated/uapi/asm
 
 # To make sure we do not include .config for any of the *config targets
 # catch them early, and hand them over to scripts/kconfig/Makefile
@@ -459,9 +451,8 @@ asm-generic:
 version_h := include/generated/version.h
 
 no-dot-config-targets := pristine distclean clean mrproper help \
-			 cscope gtags TAGS tags help% %docs check% coccicheck \
-			 $(version_h) headers_% archheaders archscripts \
-			 kernelversion %src-pkg
+			 cscope gtags TAGS tags help% %docs check% \
+			 $(version_h) headers_% kernelversion %src-pkg
 
 config-targets := 0
 mixed-targets  := 0
@@ -505,7 +496,7 @@ ifeq ($(config-targets),1)
 # Read arch specific Makefile to set KBUILD_DEFCONFIG as needed.
 # KBUILD_DEFCONFIG may point out an alternative default configuration
 # used for 'make defconfig'
-include $(srctree)/arch/$(SRCARCH)/Makefile
+include $(srctree)/arch/$(subst $(DQUOTE),,$(CONFIG_ARCH))/Makefile
 export KBUILD_DEFCONFIG KBUILD_KCONFIG
 
 config: scripts_basic outputmakefile FORCE
@@ -527,7 +518,7 @@ scripts: scripts_basic include/config/auto.conf include/config/tristate.conf
 	$(Q)$(MAKE) $(build)=$(@)
 
 
-core-y := lib/ arch/ kernel/ misc/ debug/
+core-y := lib/ kernel/ misc/ net/ boards/ arch/
 drivers-y := drivers/
 
 ifneq ($(strip $(PROJECT)),)
@@ -535,7 +526,7 @@ ifneq ($(strip $(PROJECT)),)
 ifneq ($(strip $(KBUILD_ZEPHYR_APP)),)
 export KBUILD_ZEPHYR_APP
 endif
-core-y += $(SOURCE_DIR)
+app-y := $(SOURCE_DIR)
 endif
 
 
@@ -569,11 +560,18 @@ libs-y += $(KCRYPTO_DIR)/
  ZEPHYRINCLUDE += -I$(srctree)/lib/crypto/tinycrypt/include
 endif
 
+ARCH = $(subst $(DQUOTE),,$(CONFIG_ARCH))
+export ARCH
 ifdef ZEPHYR_GCC_VARIANT
 include $(srctree)/scripts/Makefile.toolchain.$(ZEPHYR_GCC_VARIANT)
 else
 $(if $(CROSS_COMPILE),, \
      $(error ZEPHYR_GCC_VARIANT is not set. ))
+endif
+
+ifdef CONFIG_QMSI_DRIVERS
+LIB_INCLUDE_DIR += -L$(CONFIG_QMSI_INSTALL_PATH:"%"=%)/lib
+ALL_LIBS += qmsi
 endif
 
 ifdef CONFIG_MINIMAL_LIBC
@@ -586,14 +584,13 @@ ALL_LIBS += c m
 endif
 
 QEMU_BIN_PATH	?= /usr/bin
-QEMU		= $(QEMU_BIN_PATH)/$(QEMU_$(SRCARCH))
+QEMU		= $(QEMU_BIN_PATH)/$(QEMU_$(ARCH))
 
 # The all: target is the default when no target is given on the
 # command line.
 # This allow a user to issue only 'make' to build a kernel including modules
 # Defaults to zephyr, but the arch makefile usually adds further targets
 all: zephyr
-
 
 ifdef CONFIG_READABLE_ASM
 # Disable optimizations that make assembler listings hard to read.
@@ -605,55 +602,45 @@ KBUILD_CFLAGS += $(call cc-option,-fno-reorder-blocks,) \
                  $(call cc-option,-fno-partial-inlining)
 endif
 
-# Handle stack protector mode.
-#
-# Since kbuild can potentially perform two passes (first with the old
-# .config values and then with updated .config values), we cannot error out
-# if a desired compiler option is unsupported. If we were to error, kbuild
-# could never get to the second pass and actually notice that we changed
-# the option to something that was supported.
-#
-# Additionally, we don't want to fallback and/or silently change which compiler
-# flags will be used, since that leads to producing kernels with different
-# security feature characteristics depending on the compiler used. ("But I
-# selected CC_STACKPROTECTOR_STRONG! Why did it build with _REGULAR?!")
-#
-# The middle ground is to warn here so that the failed option is obvious, but
-# to let the build fail with bad compiler flags so that we can't produce a
-# kernel when there is a CONFIG and compiler mismatch.
-#
-ifdef CONFIG_CC_STACKPROTECTOR_REGULAR
-  stackp-flag := -fstack-protector
-  ifeq ($(call cc-option, $(stackp-flag)),)
-    $(warning Cannot use CONFIG_CC_STACKPROTECTOR_REGULAR: \
-             -fstack-protector not supported by compiler)
-  endif
-else
-ifdef CONFIG_CC_STACKPROTECTOR_STRONG
-  stackp-flag := -fstack-protector-strong
-  ifeq ($(call cc-option, $(stackp-flag)),)
-    $(warning Cannot use CONFIG_CC_STACKPROTECTOR_STRONG: \
-	      -fstack-protector-strong not supported by compiler)
-  endif
-endif
-endif
-KBUILD_CFLAGS += $(stackp-flag)
-
 ifeq ($(CONFIG_DEBUG),y)
 KBUILD_CFLAGS  += -O0
 else
 KBUILD_CFLAGS  += -Os
 endif
 
+ifeq ($(CONFIG_STACK_CANARIES),y)
+KBUILD_CFLAGS += $(call cc-option,-fstack-protector-all,)
+else
+KBUILD_CFLAGS += $(call cc-option,-fno-stack-protector,)
+endif
+
 KBUILD_CFLAGS += $(subst $(DQUOTE),,$(CONFIG_COMPILER_OPT))
 
-export LDFLAG_LINKERCMD OUTPUT_FORMAT OUTPUT_ARCH
+export LDFLAG_LINKERCMD
 
-include arch/$(SRCARCH)/Makefile
+include arch/$(ARCH)/Makefile
 
 KBUILD_CFLAGS += $(CFLAGS)
+KBUILD_CXXFLAGS += $(CXXFLAGS)
 KBUILD_AFLAGS += $(CFLAGS)
 
+
+ifeq ($(COMPILER),clang)
+KBUILD_CPPFLAGS += $(call cc-option,-Qunused-arguments,)
+KBUILD_CPPFLAGS += $(call cc-option,-Wno-unknown-warning-option,)
+KBUILD_CFLAGS += $(call cc-disable-warning, unused-variable)
+KBUILD_CFLAGS += $(call cc-disable-warning, format-invalid-specifier)
+KBUILD_CFLAGS += $(call cc-disable-warning, gnu)
+# Quiet clang warning: comparison of unsigned expression < 0 is always false
+KBUILD_CFLAGS += $(call cc-disable-warning, tautological-compare)
+else
+
+# This warning generated too much noise in a regular build.
+# Use make W=1 to enable this warning (see scripts/Makefile.build)
+KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
+KBUILD_CFLAGS += $(call cc-option,-fno-reorder-functions)
+KBUILD_CFLAGS += $(call cc-option,-fno-defer-pop)
+endif
 
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
@@ -670,8 +657,12 @@ KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
 # disable invalid "can't wrap" optimizations for signed / pointers
 KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)
 
-# conserve stack if available
-KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
+# generate an extra file that specifies the maximum amount of stack used,
+# on a per-function basis.
+ifdef CONFIG_STACK_USAGE
+KBUILD_CFLAGS	+= $(call cc-option,-fstack-usage)
+endif
+
 
 # disallow errors like 'EXPORT_GPL(foo);' with missing header
 KBUILD_CFLAGS   += $(call cc-option,-Werror=implicit-int)
@@ -691,10 +682,7 @@ KBUILD_CFLAGS += $(KCFLAGS)
 
 # Use --build-id when available.
 
-LDFLAGS_zephyr += $(call ld-option,-nostartfiles)
-LDFLAGS_zephyr += $(call ld-option,-nodefaultlibs)
-LDFLAGS_zephyr += $(call ld-option,-nostdlib)
-LDFLAGS_zephyr += $(call ld-option,-static)
+LDFLAGS_zephyr += $(LDFLAGS)
 LDFLAGS_zephyr += $(call ld-option,-X)
 LDFLAGS_zephyr += $(call ld-option,-N)
 LDFLAGS_zephyr += $(call ld-option,--gc-sections)
@@ -702,9 +690,25 @@ LDFLAGS_zephyr += $(call ld-option,--build-id=none)
 
 LD_TOOLCHAIN ?= -D__GCC_LINKER_CMD__
 
-KERNEL_NAME=$(subst $(DQUOTE),,$(CONFIG_KERNEL_BIN_NAME))
+ifdef CONFIG_HAVE_CUSTOM_LINKER_SCRIPT
+KBUILD_LDS         := $(subst $(DQUOTE),,$(CONFIG_CUSTOM_LINKER_SCRIPT))
+else
+# Try a board specific linker file
+KBUILD_LDS := $(srctree)/boards/$(BOARD_NAME)/linker.cmd
 
-export LD_TOOLCHAIN KERNEL_NAME
+# If not available, try an SoC specific linker file
+ifeq ($(wildcard $(KBUILD_LDS)),)
+KBUILD_LDS         := $(srctree)/arch/$(ARCH)/soc/$(SOC_NAME)/linker.cmd
+endif
+endif
+
+export LD_TOOLCHAIN KBUILD_LDS
+
+# The all: target is the default when no target is given on the
+# command line.
+# This allow a user to issue only 'make' to build a kernel including modules
+# Defaults to zephyr, but the arch makefile usually adds further targets
+all: $(KERNEL_BIN_NAME)
 
 # Default kernel image to build when no specific target is given.
 # KBUILD_IMAGE may be overruled on the command line or
@@ -713,66 +717,118 @@ export LD_TOOLCHAIN KERNEL_NAME
 # this default value
 export KBUILD_IMAGE ?= zephyr
 
-#
-# INSTALL_PATH specifies where to place the updated kernel and system map
-# images. Default is /boot, but you can set it to other values
-export	INSTALL_PATH ?= /boot
-
-#
-# INSTALL_DTBS_PATH specifies a prefix for relocations required by build roots.
-# Like INSTALL_MOD_PATH, it isn't defined in the Makefile, but can be passed as
-# an argument if needed. Otherwise it defaults to the kernel install path
-#
-export INSTALL_DTBS_PATH ?= $(INSTALL_PATH)/dtbs/$(KERNELRELEASE)
-
-core-y		+=
-
-zephyr-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
-		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
-		     $(libs-y) $(libs-m)))
+zephyr-dirs	:= $(patsubst %/,%,$(filter %/, $(core-y) $(drivers-y) \
+		     $(libs-y) $(app-y)))
 
 zephyr-alldirs	:= $(sort $(zephyr-dirs) $(patsubst %/,%,$(filter %/, \
-		     $(init-) $(core-) $(drivers-) $(libs-))))
+		     $(core-) $(drivers-) $(libs-) $(app-))))
 
-init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
+app-y		:= $(patsubst %/, %/built-in.o, $(app-y))
 drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
 libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
 libs-y		:= $(libs-y1) $(libs-y2)
 
-# Externally visible symbols (used by link-zephyr.sh)
-export KBUILD_ZEPHYR_INIT := $(head-y) $(init-y)
-export KBUILD_ZEPHYR_MAIN := $(drivers-y) $(core-y) $(libs-y)
-ifdef CONFIG_HAVE_CUSTOM_LINKER_SCRIPT
-export KBUILD_LDS         := $(subst $(DQUOTE),,$(CONFIG_CUSTOM_LINKER_SCRIPT))
-else
-export KBUILD_LDS         := $(srctree)/arch/$(SRCARCH)/platforms/$(subst $(DQUOTE),,$(CONFIG_PLATFORM))/linker.cmd
-endif
+export KBUILD_ZEPHYR_MAIN := $(drivers-y) $(libs-y) $(app-y) $(core-y)
 export LDFLAGS_zephyr
-# used by scripts/pacmage/Makefile
-export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(zephyr-alldirs)) arch include samples scripts)
 
-zephyr-deps := $(KBUILD_LDS) $(KBUILD_ZEPHYR_INIT) $(KBUILD_ZEPHYR_MAIN)
+zephyr-deps := $(KBUILD_LDS) $(KBUILD_ZEPHYR_MAIN)
 
 ALL_LIBS += $(TOOLCHAIN_LIBS)
 export ALL_LIBS
 
-# Final link of zephyr
-      cmd_link-zephyr = $(CONFIG_SHELL) $< $(LD) $(LDFLAGS) $(LDFLAGS_zephyr) $(LIB_INCLUDE_DIR) $(ALL_LIBS)
-quiet_cmd_link-zephyr = LINK    $@
+LINK_LIBS := $(foreach l,$(ALL_LIBS), -l$(l))
 
-# Include targets which we want to
-# execute if the rest of the kernel build went well.
-zephyr: scripts/link-zephyr.sh $(zephyr-deps) $(KBUILD_ZEPHYR_APP) FORCE
-	@touch zephyr
-ifdef CONFIG_HEADERS_CHECK
-	$(Q)$(MAKE) -f $(srctree)/Makefile headers_check
+OUTPUT_FORMAT ?= elf32-i386
+OUTPUT_ARCH ?= i386
+
+quiet_cmd_create-lnk = LINK    $@
+      cmd_create-lnk =								\
+(										\
+	echo $(LDFLAGS_zephyr); 						\
+	echo "-Map ./$(KERNEL_NAME).map"; 					\
+	echo "-L $(objtree)/include/generated";					\
+	echo "-u _OffsetAbsSyms -u _ConfigAbsSyms"; 				\
+	echo "-e __start"; 						 	\
+	echo "--start-group";							\
+	echo "--whole-archive $(KBUILD_ZEPHYR_APP) --no-whole-archive";         \
+	echo "$(KBUILD_ZEPHYR_MAIN)";						\
+	echo "$(objtree)/arch/$(ARCH)/core/offsets/offsets.o"; 			\
+	echo "--end-group"; 							\
+	echo "$(LIB_INCLUDE_DIR) $(LINK_LIBS)";					\
+) > $@
+
+$(KERNEL_NAME).lnk:
+	$(call cmd,create-lnk)
+
+linker.cmd: $(zephyr-deps)
+	$(Q)$(CC) -x assembler-with-cpp -nostdinc -undef -E -P \
+	$(LDFLAG_LINKERCMD) $(LD_TOOLCHAIN) -I$(srctree)/include \
+	-I$(objtree)/include/generated $(EXTRA_LINKER_CMD_OPT) $(KBUILD_LDS) -o $@
+
+final-linker.cmd: $(zephyr-deps)
+	$(Q)$(CC) -x assembler-with-cpp -nostdinc -undef -E -P \
+	$(LDFLAG_LINKERCMD) $(LD_TOOLCHAIN) -DFINAL_LINK -I$(srctree)/include \
+	-I$(objtree)/include/generated $(EXTRA_LINKER_CMD_OPT) $(KBUILD_LDS) -o $@
+
+TMP_ELF = .tmp_$(KERNEL_NAME).prebuilt
+
+$(TMP_ELF): $(zephyr-deps) $(KBUILD_ZEPHYR_APP) linker.cmd $(KERNEL_NAME).lnk
+	$(Q)$(LD) -T linker.cmd @$(KERNEL_NAME).lnk -o $@
+
+quiet_cmd_gen_idt = SIDT    $@
+      cmd_gen_idt =								\
+(										\
+	$(OBJCOPY) -I $(OUTPUT_FORMAT)  -O binary -j intList $< isrList.bin &&	\
+	$(GENIDT) -i isrList.bin -n $(CONFIG_IDT_NUM_VECTORS) -o staticIdt.bin 	\
+		-b int_vector_alloc.bin -m irq_int_vector_map.bin		\
+		-l $(CONFIG_MAX_IRQ_LINES) &&					\
+	$(OBJCOPY) -I binary -B $(OUTPUT_ARCH) -O $(OUTPUT_FORMAT) 		\
+		--rename-section .data=staticIdt staticIdt.bin staticIdt.o &&	\
+	$(OBJCOPY) -I binary -B $(OUTPUT_ARCH) -O $(OUTPUT_FORMAT) 		\
+		--rename-section .data=int_vector_alloc int_vector_alloc.bin	\
+		int_vector_alloc.o &&						\
+	$(OBJCOPY) -I binary -B $(OUTPUT_ARCH) -O $(OUTPUT_FORMAT) 		\
+	--rename-section .data=irq_int_vector_map irq_int_vector_map.bin 	\
+		irq_int_vector_map.o &&						\
+	rm staticIdt.bin irq_int_vector_map.bin int_vector_alloc.bin isrList.bin\
+)
+
+staticIdt.o: $(TMP_ELF)
+	$(call cmd,gen_idt)
+
+quiet_cmd_lnk_elf = LINK    $@
+      cmd_lnk_elf =									\
+(											\
+	$(LD) -T final-linker.cmd @$(KERNEL_NAME).lnk staticIdt.o int_vector_alloc.o 	\
+	irq_int_vector_map.o -o $@;							\
+	${OBJCOPY} --change-section-address intList=${CONFIG_PHYS_LOAD_ADDR} $@ elf.tmp;\
+	$(OBJCOPY) -R intList elf.tmp $@;						\
+	rm elf.tmp									\
+)
+
+ifeq ($(ARCH),x86)
+$(KERNEL_ELF_NAME): staticIdt.o final-linker.cmd
+	$(call cmd,lnk_elf)
+else
+$(KERNEL_ELF_NAME): $(TMP_ELF)
+	@cp $(TMP_ELF) $(KERNEL_ELF_NAME)
 endif
 
-ifneq ($(strip $(PROJECT)),)
-	+$(call if_changed,link-zephyr)
-endif
+
+quiet_cmd_gen_bin = BIN     $@
+      cmd_gen_bin =									\
+(											\
+        $(OBJDUMP) -S $< > $(KERNEL_NAME).lst;						\
+        $(OBJCOPY) -S -O binary -R .note -R .comment -R COMMON -R .eh_frame $< $@;	\
+        $(STRIP) -s -o $(KERNEL_NAME).strip $<;						\
+)
+
+$(KERNEL_BIN_NAME): $(KERNEL_ELF_NAME)
+	$(call cmd,gen_bin)
+
+zephyr: $(zephyr-deps) $(KERNEL_BIN_NAME)
 
 # The actual objects are generated when descending,
 # make sure no implicit rule kicks in
@@ -815,10 +871,9 @@ prepare2: prepare3 outputmakefile
 
 prepare1: prepare2 $(version_h) \
                    include/config/auto.conf
-	$(cmd_crmodverdir)
 
 archprepare_common = $(strip \
-		archheaders archscripts prepare1 scripts_basic \
+		prepare1 scripts_basic \
 		)
 
 
@@ -875,54 +930,6 @@ PHONY += depend dep
 depend dep:
 	@echo '*** Warning: make $@ is unnecessary now.'
 
-
-# ---------------------------------------------------------------------------
-# Kernel headers
-
-#Default location for installed headers
-export INSTALL_HDR_PATH = $(objtree)/usr
-
-# If we do an all arch process set dst to asm-$(hdr-arch)
-hdr-dst = $(if $(KBUILD_HEADERS), dst=include/asm-$(hdr-arch), dst=include/asm)
-
-PHONY += archheaders
-archheaders:
-
-PHONY += archscripts
-archscripts:
-
-PHONY += __headers
-__headers: $(version_h) scripts_basic asm-generic archheaders archscripts FORCE
-	$(Q)$(MAKE) $(build)=scripts build_unifdef
-
-PHONY += headers_install_all
-headers_install_all:
-	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/headers.sh install
-
-PHONY += headers_install
-headers_install: __headers
-	$(if $(wildcard $(srctree)/arch/$(hdr-arch)/include/uapi/asm/Kbuild),, \
-	  $(error Headers not exportable for the $(SRCARCH) architecture))
-	$(Q)$(MAKE) $(hdr-inst)=include/uapi
-	$(Q)$(MAKE) $(hdr-inst)=arch/$(hdr-arch)/include/uapi/asm $(hdr-dst)
-
-PHONY += headers_check_all
-headers_check_all: headers_install_all
-	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/headers.sh check
-
-PHONY += headers_check
-headers_check: headers_install
-	$(Q)$(MAKE) $(hdr-inst)=include/uapi HDRCHECK=1
-	$(Q)$(MAKE) $(hdr-inst)=arch/$(hdr-arch)/include/uapi/asm $(hdr-dst) HDRCHECK=1
-
-# ---------------------------------------------------------------------------
-# Kernel selftest
-
-PHONY += kselftest
-kselftest:
-	$(Q)$(MAKE) -C tools/testing/selftests run_tests
-
-
 ###
 # Cleaning is done on three levels.
 # make clean     Delete most generated files
@@ -933,8 +940,11 @@ kselftest:
 CLEAN_DIRS  += $(MODVERDIR)
 
 CLEAN_FILES += 	misc/generated/sysgen/kernel_main.c \
-		misc/generated/sysgen/zephyr.h \
-		misc/generated/sysgen/prj.mdef
+		misc/generated/sysgen/sysgen.h \
+		misc/generated/sysgen/prj.mdef \
+		.old_version .tmp_System.map .tmp_version \
+		.tmp_* System.map *.lnk *.map *.elf *.lst \
+		*.bin *.strip staticIdt.o linker.cmd final-linker.cmd
 
 # Directories & files removed with 'make mrproper'
 MRPROPER_DIRS  += include/config usr/include include/generated          \
@@ -955,10 +965,7 @@ PHONY += $(clean-dirs) clean archclean zephyrclean
 $(clean-dirs):
 	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-zephyrclean:
-	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/link-zephyr.sh clean
-
-clean: archclean zephyrclean
+clean: archclean
 
 # mrproper - Delete all generated files, including .config
 #
@@ -988,10 +995,8 @@ distclean: mrproper
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------
 
-boards := $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*_defconfig)
+boards := $(wildcard $(srctree)/boards/*/*_defconfig)
 boards := $(sort $(notdir $(boards)))
-board-dirs := $(dir $(wildcard $(srctree)/arch/$(SRCARCH)/configs/*/*_defconfig))
-board-dirs := $(sort $(notdir $(board-dirs:/=)))
 
 help:
 	@echo  'Cleaning targets:'
@@ -1005,21 +1010,23 @@ help:
 	@echo  ''
 	@echo  'Other generic targets:'
 	@echo  '  all		  - Build all targets marked with [*]'
-	@echo  '* zephyr	  - Build the bare kernel'
-	@echo  '  qemu		  - Build the bare kernel and runs the emulation with qemu'
+	@echo  '* zephyr	  - Build a zephyr application'
+	@echo  '  qemu		  - Build a zephyr application and run it in qemu'
+	@echo  '  flash		  - Build and flash an application'
 	@echo  ''
-	@echo  'Architecture specific targets ($(SRCARCH)):'
-	@$(if $(archhelp),$(archhelp),\
-		echo '  No architecture specific help defined for $(SRCARCH)')
+	@echo  'Supported Boards:'
+	@echo  ''
+	@echo  '  To build an image for one of the supported boards below, run:'
+	@echo  ''
+	@echo  '  make BOARD=<BOARD NAME>'
+	@echo  '  in the application directory.'
+	@echo  '  To flash the image (if supported), run:'
+	@echo  ''
+	@echo  '  make BOARD=<BOARD NAME> flash'
 	@echo  ''
 	@$(if $(boards), \
 		$(foreach b, $(boards), \
 		printf "  %-24s - Build for %s\\n" $(b) $(subst _defconfig,,$(b));) \
-		echo '')
-	@$(if $(board-dirs), \
-		$(foreach b, $(board-dirs), \
-		printf "  %-16s - Show %s-specific targets\\n" help-$(b) $(b);) \
-		printf "  %-16s - Show all of the above\\n" help-boards; \
 		echo '')
 
 	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
@@ -1041,10 +1048,10 @@ help-board-dirs := $(addprefix help-,$(board-dirs))
 
 help-boards: $(help-board-dirs)
 
-boards-per-dir = $(sort $(notdir $(wildcard $(srctree)/arch/$(SRCARCH)/configs/$*/*_defconfig)))
+boards-per-dir = $(sort $(notdir $(wildcard $(srctree)/boards/$*/*_defconfig)))
 
 $(help-board-dirs): help-%:
-	@echo  'Architecture specific targets ($(SRCARCH) $*):'
+	@echo  'Architecture specific targets ($(ARCH) $*):'
 	@$(if $(boards-per-dir), \
 		$(foreach b, $(boards-per-dir), \
 		printf "  %-24s - Build for %s\\n" $*/$(b) $(subst _defconfig,,$(b));) \
@@ -1060,13 +1067,10 @@ clean: $(clean-dirs)
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
 	@find $(if $(KBUILD_EXTMOD), $(KBUILD_EXTMOD), .) $(RCS_FIND_IGNORE) \
-		\( -name '*.[oas]' -o -name '*.ko' -o -name '.*.cmd' \
-		-o -name '*.ko.*' \
-		-o -name '*.dwo'  \
-		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \
-		-o -name '*.symtypes' \
-		-o -name modules.builtin -o -name '.tmp_*.o.*' \
-		-o -name '*.gcno' \) -type f -print | xargs rm -f
+		\( -name '*.[oas]' -o -name '.*.cmd' \
+		-o -name '*.dwo' -o -name '.*.d' -o -name '.*.tmp'  \
+		-o -name '.tmp_*.o.*' -o -name '*.gcno' \) -type f \
+		-print | xargs rm -f
 
 # Generate tags for editors
 # ---------------------------------------------------------------------------
@@ -1076,46 +1080,15 @@ quiet_cmd_tags = GEN     $@
 tags TAGS cscope gtags: FORCE
 	$(call cmd,tags)
 
-# Scripts to check various things for consistency
-# ---------------------------------------------------------------------------
-
-PHONY += includecheck versioncheck coccicheck namespacecheck export_report
-
-includecheck:
-	find $(srctree)/* $(RCS_FIND_IGNORE) \
-		-name '*.[hcS]' -type f -print | sort \
-		| xargs $(PERL) -w $(srctree)/scripts/checkincludes.pl
-
-versioncheck:
-	find $(srctree)/* $(RCS_FIND_IGNORE) \
-		-name '*.[hcS]' -type f -print | sort \
-		| xargs $(PERL) -w $(srctree)/scripts/checkversion.pl
-
-coccicheck:
-	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/$@
-
-namespacecheck:
-	$(PERL) $(srctree)/scripts/namespace.pl
-
-export_report:
-	$(PERL) $(srctree)/scripts/export_report.pl
-
 endif #ifeq ($(config-targets),1)
 endif #ifeq ($(mixed-targets),1)
 
 PHONY += checkstack kernelversion image_name
 
-# UML needs a little special treatment here.  It wants to use the host
-# toolchain, so needs $(SUBARCH) passed to checkstack.pl.  Everyone
-# else wants $(ARCH), including people doing cross-builds, which means
-# that $(SUBARCH) doesn't work here.
-ifeq ($(ARCH), um)
-CHECKSTACK_ARCH := $(SUBARCH)
-else
 CHECKSTACK_ARCH := $(ARCH)
-endif
+
 checkstack:
-	$(OBJDUMP) -d zephyr $$(find . -name '*.ko') | \
+	$(OBJDUMP) -d $(O)/$(KERNEL_ELF_NAME) | \
 	$(PERL) $(src)/scripts/checkstack.pl $(CHECKSTACK_ARCH)
 
 kernelversion:
@@ -1133,7 +1106,7 @@ tools/%: FORCE
 	$(Q)mkdir -p $(objtree)/tools
 	$(Q)$(MAKE) LDFLAGS= MAKEFLAGS="$(filter --j% -j,$(MAKEFLAGS))" O=$(objtree) subdir=tools -C $(src)/tools/ $*
 
-QEMU_FLAGS = $(QEMU_FLAGS_$(SRCARCH)) -pidfile qemu.pid
+QEMU_FLAGS = $(QEMU_FLAGS_$(ARCH)) -pidfile qemu.pid
 
 ifneq ($(QEMU_PIPE),)
     # Send console output to a pipe, used for running automated sanity tests
@@ -1144,18 +1117,26 @@ endif
 
 qemu: zephyr
 	$(if $(QEMU_PIPE),,@echo "To exit from QEMU enter: 'CTRL+a, x'")
-	@echo '[QEMU] CPU: $(QEMU_CPU_TYPE_$(SRCARCH))'
-	$(Q)$(QEMU) $(QEMU_FLAGS) $(QEMU_EXTRA_FLAGS) -kernel $(KERNEL_NAME).elf
+	@echo '[QEMU] CPU: $(QEMU_CPU_TYPE_$(ARCH))'
+	$(Q)$(QEMU) $(QEMU_FLAGS) $(QEMU_EXTRA_FLAGS) -kernel $(KERNEL_ELF_NAME)
 
-GDB_ARCH_arm=arm-none-eabi
-GDB_ARCH_x86=i686-elf
-GDB_ARCH=${GDB_ARCH_${ARCH}}
-GDB=/root_vxmicro/host/mentor/all/bin/${GDB_ARCH}-gdb
+-include $(srctree)/boards/$(BOARD_NAME)/Makefile.board
+ifneq ($(FLASH_SCRIPT),)
+flash: zephyr
+	@echo "Flashing $(BOARD_NAME)"
+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/support/$(FLASH_SCRIPT) flash
 
-qemu.gdb: zephyr
-	$(if $(QEMU_PIPE),,@echo "To exit from QEMU enter: 'CTRL+a, x'")
-	@echo '[QEMU] CPU: $(QEMU_CPU_TYPE_$(SRCARCH))'
-	@${ZEPHYR_BASE}/scripts/run-qemu-gdb.sh ${QEMU} ${KERNEL_NAME} ${GDB} $(QEMU_FLAGS) $(QEMU_EXTRA_FLAGS)
+debug: zephyr
+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/support/$(FLASH_SCRIPT) debug
+else
+flash: FORCE
+	@echo Flashing not supported with this board.
+	@echo Please check the documentation for alternate instructions.
+
+debug: FORCE
+	@echo Debugging not supported with this board.
+	@echo Please check the documentation for alternate instructions.
+endif
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -1175,6 +1156,10 @@ qemu.gdb: zephyr
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.o: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+%.o: %.cpp prepare scripts FORCE
+	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
+%.o: %.cxx prepare scripts FORCE
+	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.lst: %.c prepare scripts FORCE
 	$(Q)$(MAKE) $(build)=$(build-dir) $(target-dir)$(notdir $@)
 %.s: %.S prepare scripts FORCE
@@ -1186,11 +1171,9 @@ qemu.gdb: zephyr
 
 # Modules
 /: prepare scripts FORCE
-	$(cmd_crmodverdir)
 	$(Q)$(MAKE) $(build)=$(build-dir)
 
 %/: prepare scripts FORCE
-	$(cmd_crmodverdir)
 	$(Q)$(MAKE) $(build)=$(build-dir)
 
 # FIXME Should go into a make.lib or something

@@ -1,5 +1,3 @@
-/* toolchain/gcc.h - GCC toolchain abstraction */
-
 /*
  * Copyright (c) 2010-2014 Wind River Systems, Inc.
  *
@@ -16,13 +14,12 @@
  * limitations under the License.
  */
 
-/*
-  DESCRIPTION
-  Macros to abstract compiler capabilities for GCC toolchain.
-
-  \NOMANUAL
+/**
+ * @file
+ * @brief GCC toolchain abstraction
+ *
+ * Macros to abstract compiler capabilities for GCC toolchain.
  */
-
 #include <toolchain/common.h>
 
 #define FUNC_ALIAS(real_func, new_alias, return_type) \
@@ -32,6 +29,11 @@
 
 #define CODE_UNREACHABLE __builtin_unreachable()
 #define FUNC_NORETURN    __attribute__((__noreturn__))
+#if defined(__clang__)
+#define FUNC_NO_FP
+#else
+#define FUNC_NO_FP	 __attribute__((optimize("-fomit-frame-pointer")))
+#endif
 
 /* The GNU assembler for Cortex-M3 uses # for immediate values, not
  * comments, so the @nobits# trick does not work.
@@ -43,24 +45,6 @@
 	__attribute__((section(#segment ",\"wa\",@nobits#")))
 #endif
 
-/*
- * Unaligned reads and writes
- *
- * To prevent GCC from generating a "breaking strict-aliasing rule" warning,
- * use the __may_alias__ attribute to inform it that the pointer may alias
- * another type.
- */
-
-#ifdef CONFIG_UNALIGNED_WRITE_UNSUPPORTED
-#define UNALIGNED_READ(p)    _Unaligned32Read((p))
-
-#define UNALIGNED_WRITE(p, v)						\
-	do  {								\
-		unsigned int __attribute__((__may_alias__)) *pp = (unsigned int *)(p); \
-		_Unaligned32Write(pp, (v));				\
-	}								\
-	while (0)
-#else  /* !CONFIG_UNALIGNED_WRITE_UNSUPPORTED */
 #define UNALIGNED_READ(p) (*(p))
 
 #define UNALIGNED_WRITE(p, v)						\
@@ -69,7 +53,6 @@
 		*pp = (v);						\
 	}								\
 	while (0)
-#endif /* !CONFIG_UNALIGNED_WRITE_UNSUPPORTED */
 
 /* Unaligned access */
 #define UNALIGNED_GET(p)						\
@@ -82,12 +65,15 @@ __extension__ ({							\
 
 #define _GENERIC_SECTION(segment) __attribute__((section(#segment)))
 
+#ifndef __packed
 #define __packed        __attribute__((__packed__))
-#define __aligned(x)    __attribute__((aligned(x)))
+#endif
+#ifndef __aligned
+#define __aligned(x)	__attribute__((__aligned__(x)))
+#endif
 #define __may_alias     __attribute__((__may_alias__))
 #define __printf_like(f, a)   __attribute__((format (printf, f, a)))
-#define __used          __attribute__((used))
-
+#define __used		__attribute__((__used__))
 #define ARG_UNUSED(x) (void)(x)
 
 #define likely(x)   __builtin_expect((long)!!(x), 1L)
@@ -146,10 +132,10 @@ A##a:
 #if defined(_ASMLANGUAGE) && !defined(_LINKER)
 
 #ifdef CONFIG_ARM
-#define GTEXT(sym) .global FUNC(sym); .type FUNC(sym),%function
-#define GDATA(sym) .global FUNC(sym); .type FUNC(sym),%object
-#define WTEXT(sym) .weak FUNC(sym); .type FUNC(sym),%function
-#define WDATA(sym) .weak FUNC(sym); .type FUNC(sym),%object
+#define GTEXT(sym) .global FUNC(sym); .type FUNC(sym), %function
+#define GDATA(sym) .global FUNC(sym); .type FUNC(sym), %object
+#define WTEXT(sym) .weak FUNC(sym); .type FUNC(sym), %function
+#define WDATA(sym) .weak FUNC(sym); .type FUNC(sym), %object
 #elif defined(CONFIG_ARC)
 /*
  * Need to use assembly macros because ';' is interpreted as the start of
@@ -166,11 +152,18 @@ A##a:
 	.type FUNC(\symbol), %object
 .endm
 
+.macro weak_data symbol
+	.weak FUNC(\symbol)
+	.type FUNC(\symbol), %object
+.endm
+
 #define GTEXT(sym) glbl_text sym
 #define GDATA(sym) glbl_data sym
+#define WDATA(sym) weak_data sym
+
 #else  /* !CONFIG_ARM && !CONFIG_ARC */
-#define GTEXT(sym) .globl FUNC(sym); .type FUNC(sym),@function
-#define GDATA(sym) .globl FUNC(sym); .type FUNC(sym),@object
+#define GTEXT(sym) .globl FUNC(sym); .type FUNC(sym), @function
+#define GDATA(sym) .globl FUNC(sym); .type FUNC(sym), @object
 #endif
 
 /*
@@ -194,21 +187,21 @@ A##a:
 
 .macro section_var section, symbol
 	.section .\section\().FUNC(\symbol)
-	FUNC(\symbol):
+	FUNC(\symbol) :
 .endm
 
 .macro section_func section, symbol
 	.section .\section\().FUNC(\symbol), "ax"
 	FUNC_CODE()
 	PERFOPT_ALIGN
-	FUNC(\symbol):
+	FUNC(\symbol) :
 	FUNC_INSTR(\symbol)
 .endm
 
 .macro section_subsec_func section, subsection, symbol
 	.section .\section\().\subsection, "ax"
 	PERFOPT_ALIGN
-	FUNC(\symbol):
+	FUNC(\symbol) :
 .endm
 
 #define SECTION_VAR(sect, sym) section_var sect, sym
@@ -217,14 +210,14 @@ A##a:
 	section_subsec_func sect, subsec, sym
 #else /* !CONFIG_ARC */
 
-#define SECTION_VAR(sect, sym)  .section .sect.FUNC(sym); FUNC(sym):
+#define SECTION_VAR(sect, sym)  .section .sect.FUNC(sym); FUNC(sym) :
 #define SECTION_FUNC(sect, sym)						\
 	.section .sect.FUNC(sym), "ax";					\
 				FUNC_CODE()				\
-				PERFOPT_ALIGN; FUNC(sym):		\
+				PERFOPT_ALIGN; FUNC(sym) :		\
 							FUNC_INSTR(sym)
 #define SECTION_SUBSEC_FUNC(sect, subsec, sym)				\
-		.section .sect.subsec, "ax"; PERFOPT_ALIGN; FUNC(sym):
+		.section .sect.subsec, "ax"; PERFOPT_ALIGN; FUNC(sym) :
 
 #endif /* CONFIG_ARC */
 
@@ -250,7 +243,7 @@ A##a:
 #define GEN_OFFSET_EXTERN(name) extern const char name[]
 
 #define GEN_ABS_SYM_BEGIN(name) \
-	extern void name(void); \
+	EXTERN_C void name(void); \
 	void name(void)         \
 	{
 
@@ -271,7 +264,7 @@ A##a:
 		",%B0"                              \
 		"\n\t.type\t" #name ",%%object" :  : "n"(~(value)))
 
-#elif defined(CONFIG_X86_32) || defined(CONFIG_ARC)
+#elif defined(CONFIG_X86) || defined(CONFIG_ARC)
 
 #define GEN_ABSOLUTE_SYM(name, value)               \
 	__asm__(".globl\t" #name "\n\t.equ\t" #name \

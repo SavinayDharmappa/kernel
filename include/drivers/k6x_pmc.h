@@ -1,5 +1,3 @@
-/* Freescale K6x microprocessor PMC register definitions */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,12 +14,14 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module defines the Power Management Controller (PMC) registers for the
-K6x Family of microprocessors.
-NOTE: Not all the registers are currently defined here - only those that are
-currently used.
+/**
+ * @file
+ * @brief Freescale K6x microprocessor PMC register definitions
+ *
+ * This module defines the Power Management Controller (PMC) registers for the
+ * K6x Family of microprocessors.
+ * NOTE: Not all the registers are currently defined here - only those that are
+ * currently used.
  */
 
 #ifndef _K6xPMC_H_
@@ -29,9 +29,13 @@ currently used.
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define PMC_REGSC_ACKISO_MASK 0x08 /* ack I/O isolation (write to clear) */
 
-typedef union {
+union REGSC {
 	uint8_t value;
 	struct {
 		uint8_t bandgapBufEn : 1 __packed; /* bandgap buffering */
@@ -42,12 +46,16 @@ typedef union {
 		uint8_t res_5 : 1 __packed;
 		uint8_t res_6 : 2 __packed; /* RAZ/WI */
 	} field;
-} REGSC_t; /* 0x0002 Regulator Status/Control Register */
+}; /* 0x0002 Regulator Status/Control Register */
 
-typedef volatile struct {
-	uint8_t lvdsc1; /* 0x0000 */
-	uint8_t lvdsc2; /* 0x0001 */
-	REGSC_t regsc;  /* 0x0002 */
-} K6x_PMC_t;		/* K6x Microntroller PMC module */
+struct K6x_PMC {
+	uint8_t lvdsc1;		/* 0x0000 */
+	uint8_t lvdsc2;		/* 0x0001 */
+	union REGSC regsc;	/* 0x0002 */
+};	/* K6x Microntroller PMC module */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _K6xPMC_H_ */

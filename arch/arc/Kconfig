@@ -15,25 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-config	ARC
-	def_bool y
+menu "ARC architecture"
+	depends on ARC
+
+config ARCH
+	default "arc"
 
 config ARCH_DEFCONFIG
-        string
-        default "arch/arc/defconfig"
-
-source "kernel/Kconfig"
-
-source "misc/Kconfig"
-
+	string
+	default "arch/arc/defconfig"
 
 choice
-prompt "Platform Selection"
-default PLATFORM_GENERIC_ARC
-
-config PLATFORM_GENERIC_ARC
-	bool "Minimum configuration for generic arc"
-
+prompt "SoC Selection"
+source "arch/arc/soc/*/Kconfig.soc"
 endchoice
 
 menu "ARC EM4 processor options"
@@ -43,7 +37,7 @@ config	CPU_ARCEM4
 	default y
 	select CPU_ARCV2
 	help
-         This option signifies the use of an ARC EM4 CPU
+	This option signifies the use of an ARC EM4 CPU
 
 endmenu
 
@@ -52,9 +46,30 @@ menu "ARCv2 Family Options"
 config	CPU_ARCV2
 	bool
 	default y
-	select ARC
+	select NANOKERNEL_TICKLESS_IDLE_SUPPORTED
 	help
 	  This option signifies the use of a CPU of the ARCv2 family.
+
+config RAM_START
+	prompt "RAM start address"
+	hex
+
+config RAM_SIZE
+	prompt "RAM size (in kB)"
+	int
+
+config NSIM
+	prompt "Running on the MetaWare nSIM simulator"
+	bool
+	default n
+	help
+	  For running on nSIM simulator.
+
+	  a) Uses non-XIP to run in RAM.
+	  b) Linked at address 0x4000 with 0x4000 of RAM so that it works with
+	     a pc_size of 16 (default).
+	  c) Sets the entry point to __reset, since it seems nSIM ignores the
+	     reset vector when starting (??).
 
 config	DATA_ENDIANNESS_LITTLE
 	bool
@@ -94,11 +109,11 @@ config	NUM_REGULAR_IRQ_PRIO_LEVELS
 config	NUM_IRQS
 	int
 	prompt "Upper limit of interrupt numbers/IDs used"
-	default 17
-	range 1 256
+	range 17 256
 	help
 	  Interrupts available will be 0 to NUM_IRQS-1.
-	  The minimum value is 1.
+	  The minimum value is 17 as the first 16 entries in the vector
+	  table are for CPU exceptions.
 
 	  The BSP must provide a valid default. This drives the size of the
 	  vector table.
@@ -116,6 +131,7 @@ config	FAULT_DUMP
 	int
 	prompt "Fault dump level"
 	default 2
+	range 0 2
 	help
 	  Different levels for display information when a fault occurs.
 
@@ -124,6 +140,14 @@ config	FAULT_DUMP
 	  1: Display general and short information. Consumes less memory
 	     (short strings).
 	  0: Off.
+
+config IRQ_OFFLOAD
+	bool "Enable IRQ offload"
+	default n
+	help
+	Enable irq_offload() API which allows functions to be synchronously
+	run in interrupt context. Uses one entry in the	IDT.  Mainly useful
+	for test cases.
 
 config	XIP
 	default n if NSIM
@@ -158,9 +182,9 @@ config  SW_ISR_TABLE_DYNAMIC
 	bool
 	prompt "Allow installing interrupt handlers at runtime"
 	depends on SW_ISR_TABLE
-	default y
+	default n
 	help
-	  This option enables nanoCpuIntConnect(). It moves the ISR table to
+	  This option enables irq_connect_dynamic(). It moves the ISR table to
 	  SRAM so that it is writable. This has the side-effect of removing
 	  write-protection on the ISR table.
 
@@ -220,12 +244,23 @@ config  ARCH_HAS_NANO_FIBER_ABORT
 	bool
 	# omit prompt to signify a "hidden" option
 	default n
+
+config  ARC_ATOMIC_ASM
+	bool
+	default n
+	depends on !CPU_ARCEM4
+	help
+	  Say y if the processor supports atomic assembly instructions:
+	  LLOCK and SCOND.
+
+	  Say n if not sure.
+
+	  Note that these instructions are not supported on ARC EM family
+	  processors.
+
 endmenu
 
 
-source "arch/arc/platforms/generic_arc/Kconfig"
+source "arch/arc/soc/*/Kconfig"
 
-source "drivers/Kconfig"
-
-source "net/Kconfig"
-
+endmenu

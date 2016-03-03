@@ -1,5 +1,3 @@
-/* v2/exc.h - ARCv2 public exception handling */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,13 +14,19 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-ARC-specific nanokernel exception handling interface. Included by ARC/arch.h.
+/**
+ * @file
+ * @brief ARCv2 public exception handling
+ *
+ * ARC-specific nanokernel exception handling interface. Included by ARC/arch.h.
  */
 
 #ifndef _ARCH_ARC_V2_EXC_H_
 #define _ARCH_ARC_V2_EXC_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 #else
@@ -34,5 +38,10 @@ struct __esf {
 typedef struct __esf NANO_ESF;
 extern const NANO_ESF _default_esf;
 #endif
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif /* _ARCH_ARC_V2_EXC_H_ */

@@ -1,7 +1,9 @@
+# vim: filetype=make
 # Backward compatibility
 asflags-y  += $(EXTRA_AFLAGS)
 ccflags-y  += $(EXTRA_CFLAGS)
 cppflags-y += $(EXTRA_CPPFLAGS)
+cxxflags-y += $(EXTRA_CXXFLAGS)
 ldflags-y  += $(EXTRA_LDFLAGS)
 
 #
@@ -35,11 +37,15 @@ lib-y := $(filter-out $(obj-y), $(sort $(lib-y) $(lib-m)))
 # and -m subdirs.  Just put -y's first.
 #modorder	:= $(patsubst %/,%/modules.order, $(filter %/, $(obj-y)) $(obj-m:.o=.ko))
 
+_subd-y		:= $(if $(findstring *,$(subdir-y)),$(wildcard $(addprefix $(srctree)/$(obj)/,$(subdir-y))),)
+subdir-y	:= $(sort $(foreach d,$(_subd-y), $(patsubst $(srctree)/$(obj)/%,%,$(d))))
+_obj-y		:= $(sort $(foreach d,$(_subd-y), $(patsubst $(srctree)/$(obj)/%,%/built-in.o,$(d))))
 __subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
 subdir-y	+= $(__subdir-y)
 __subdir-m	:= $(patsubst %/,%,$(filter %/, $(obj-m)))
 subdir-m	+= $(__subdir-m)
 obj-y		:= $(patsubst %/, %/built-in.o, $(obj-y))
+obj-y		+= $(_obj-y)
 obj-m		:= $(filter-out %/, $(obj-m))
 
 # Subdirectories we need to descend into
@@ -109,17 +115,9 @@ _c_flags       = $(filter-out $(CFLAGS_REMOVE_$(basetarget).o), $(orig_c_flags))
 _a_flags       = $(KBUILD_CPPFLAGS) $(KBUILD_AFLAGS) $(KBUILD_SUBDIR_ASFLAGS) \
                  $(asflags-y) $(AFLAGS_$(basetarget).o)
 _cpp_flags     = $(KBUILD_CPPFLAGS) $(cppflags-y) $(CPPFLAGS_$(@F))
-
-#
-# Enable gcov profiling flags for a file, directory or for all files depending
-# on variables GCOV_PROFILE_obj.o, GCOV_PROFILE and CONFIG_GCOV_PROFILE_ALL
-# (in this order)
-#
-ifeq ($(CONFIG_GCOV_KERNEL),y)
-_c_flags += $(if $(patsubst n%,, \
-		$(GCOV_PROFILE_$(basetarget).o)$(GCOV_PROFILE)$(CONFIG_GCOV_PROFILE_ALL)), \
-		$(CFLAGS_GCOV))
-endif
+orig_cxx_flags = $(KBUILD_CPPFLAGS) $(KBUILD_CXXFLAGS) $(KBUILD_SUBDIR_CXXFLAGS) \
+                 $(cxxflags-y) $(CXXFLAGS_$(basetarget).o)
+_cxx_flags     = $(filter-out $(CXXFLAGS_REMOVE_$(basetarget).o), $(orig_cxx_flags))
 
 # If building the kernel in a separate objtree expand all occurrences
 # of -Idir to -I$(srctree)/dir except for absolute paths (starting with '/').
@@ -128,6 +126,7 @@ ifeq ($(KBUILD_SRC),)
 __c_flags	= $(_c_flags)
 __a_flags	= $(_a_flags)
 __cpp_flags     = $(_cpp_flags)
+__cxx_flags     = $(_cxx_flags)
 else
 
 # -I$(obj) locates generated .h files
@@ -137,6 +136,7 @@ else
 __c_flags	= $(call addtree,-I$(obj)) $(call flags,_c_flags)
 __a_flags	=                          $(call flags,_a_flags)
 __cpp_flags     =                          $(call flags,_cpp_flags)
+__cxx_flags     =                          $(call flags,_cxx_flags)
 endif
 
 c_flags        = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(ZEPHYRINCLUDE)     \
@@ -152,10 +152,12 @@ cpp_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(ZEPHYRINCLUDE)     \
 ld_flags       = $(LDFLAGS) $(ldflags-y)
 
 dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
-		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
-		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
 		 -I$(srctree)/drivers/of/testcase-data                   \
 		 -undef -D__DTS__
+
+cxx_flags      = -Wp,-MD,$(depfile) $(NOSTDINC_FLAGS) $(ZEPHYRINCLUDE)     \
+		 $(__cxx_flags) $(modkern_cflags)                           \
+		 -D"KBUILD_STR(s)=\#s" $(basename_flags) $(modname_flags)
 
 # Finds the multi-part object the current object will be linked into
 modname-multi = $(sort $(foreach m,$(multi-used),\
@@ -328,29 +330,6 @@ cmd_lz4 = (cat $(filter-out FORCE,$^) | \
 	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
 	(rm -f $@ ; false)
 
-# U-Boot mkimage
-# ---------------------------------------------------------------------------
-
-MKIMAGE := $(srctree)/scripts/mkuboot.sh
-
-# SRCARCH just happens to match slightly more than ARCH (on sparc), so reduces
-# the number of overrides in arch makefiles
-UIMAGE_ARCH ?= $(SRCARCH)
-UIMAGE_COMPRESSION ?= $(if $(2),$(2),none)
-UIMAGE_OPTS-y ?=
-UIMAGE_TYPE ?= kernel
-UIMAGE_LOADADDR ?= arch_must_set_this
-UIMAGE_ENTRYADDR ?= $(UIMAGE_LOADADDR)
-UIMAGE_NAME ?= 'Linux-$(KERNELRELEASE)'
-UIMAGE_IN ?= $<
-UIMAGE_OUT ?= $@
-
-quiet_cmd_uimage = UIMAGE  $(UIMAGE_OUT)
-      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A $(UIMAGE_ARCH) -O linux \
-			-C $(UIMAGE_COMPRESSION) $(UIMAGE_OPTS-y) \
-			-T $(UIMAGE_TYPE) \
-			-a $(UIMAGE_LOADADDR) -e $(UIMAGE_ENTRYADDR) \
-			-n $(UIMAGE_NAME) -d $(UIMAGE_IN) $(UIMAGE_OUT)
 
 # XZ
 # ---------------------------------------------------------------------------

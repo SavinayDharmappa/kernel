@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-/*
+/**
  * @file
  * @brief Pipe kernel services
  */
@@ -48,103 +48,95 @@ void _k_pipe_init(void)
 	}
 }
 
-/**
- * @brief Pipe read request
- *
- * This routine attempts to read data into a memory buffer area from the
- * specified pipe.
- *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, RC_TIME, or RC_ALIGNMENT
- */
-int _task_pipe_get(kpipe_t Id, void *pBuffer,
-		int iNbrBytesToRead, int *piNbrBytesRead,
-		K_PIPE_OPTION Option, int32_t TimeOut)
+int task_pipe_get(kpipe_t id, void *buffer,
+		int bytes_to_read, int *bytes_read,
+		K_PIPE_OPTION options, int32_t timeout)
 {
 	struct k_args A;
 
-	/* some users do not check the FUNCTION return value,
-	   but immediately use iNbrBytesRead; make sure it always
-	   has a good value, even when we return failure immediately
-	   (see below) */
+	/*
+	 * some users do not check the FUNCTION return value,
+	 * but immediately use bytes_read; make sure it always
+	 * has a good value, even when we return failure immediately
+	 * (see below)
+	 */
 
-	*piNbrBytesRead = 0;
+	*bytes_read = 0;
 
-	if (unlikely(iNbrBytesToRead % SIZEOFUNIT_TO_OCTET(1))) {
+	if (unlikely(bytes_to_read % SIZEOFUNIT_TO_OCTET(1))) {
 		return RC_ALIGNMENT;
 	}
-	if (unlikely(0 == iNbrBytesToRead)) {
-		/* not allowed because enlisted requests with zero size
-		   will hang in _k_pipe_process() */
+	if (unlikely(bytes_to_read == 0)) {
+		/*
+		 * not allowed because enlisted requests with zero size
+		 * will hang in _k_pipe_process()
+		 */
 		return RC_FAIL;
 	}
-	if (unlikely(_0_TO_N == Option && TICKS_NONE != TimeOut)) {
+	if (unlikely(options == _0_TO_N && timeout != TICKS_NONE)) {
 		return RC_FAIL;
 	}
 
 	A.priority = _k_current_task->priority;
 	A.Comm = _K_SVC_PIPE_GET_REQUEST;
-	A.Time.ticks = TimeOut;
+	A.Time.ticks = timeout;
 
-	A.args.pipe_req.req_info.pipe.id = Id;
-	A.args.pipe_req.req_type.sync.total_size = iNbrBytesToRead;
-	A.args.pipe_req.req_type.sync.data_ptr = pBuffer;
+	A.args.pipe_req.req_info.pipe.id = id;
+	A.args.pipe_req.req_type.sync.total_size = bytes_to_read;
+	A.args.pipe_req.req_type.sync.data_ptr = buffer;
 
-	_k_pipe_option_set(&A.args, Option);
+	_k_pipe_option_set(&A.args, options);
 	_k_pipe_request_type_set(&A.args, _SYNCREQ);
 
 	KERNEL_ENTRY(&A);
 
-	*piNbrBytesRead = A.args.pipe_ack.xferred_size;
+	*bytes_read = A.args.pipe_ack.xferred_size;
 	return A.Time.rcode;
 }
 
-/**
- * @brief Pipe write request
- *
- * This routine attempts to write data from a memory buffer area to the
- * specified pipe.
- *
- * @return RC_OK, RC_INCOMPLETE, RC_FAIL, RC_TIME, or RC_ALIGNMENT
- */
-int _task_pipe_put(kpipe_t Id, void *pBuffer,
-		int iNbrBytesToWrite, int *piNbrBytesWritten,
-		K_PIPE_OPTION Option, int32_t TimeOut)
+int task_pipe_put(kpipe_t id, void *buffer,
+		int bytes_to_write, int *bytes_written,
+		K_PIPE_OPTION options, int32_t timeout)
 {
 	struct k_args A;
 
-	/* some users do not check the FUNCTION return value,
-	   but immediately use iNbrBytesWritten; make sure it always
-	   has a good value, even when we return failure immediately
-	   (see below) */
+	/*
+	 * some users do not check the FUNCTION return value,
+	 * but immediately use bytes_written; make sure it always
+	 * has a good value, even when we return failure immediately
+	 * (see below)
+	 */
 
-	*piNbrBytesWritten = 0;
+	*bytes_written = 0;
 
-	if (unlikely(iNbrBytesToWrite % SIZEOFUNIT_TO_OCTET(1))) {
+	if (unlikely(bytes_to_write % SIZEOFUNIT_TO_OCTET(1))) {
 		return RC_ALIGNMENT;
 	}
-	if (unlikely(0 == iNbrBytesToWrite)) {
-		/* not allowed because enlisted requests with zero size
-		   will hang in _k_pipe_process() */
+	if (unlikely(bytes_to_write == 0)) {
+		/*
+		 * not allowed because enlisted requests with zero size
+		 * will hang in _k_pipe_process()
+		 */
 		return RC_FAIL;
 	}
-	if (unlikely(_0_TO_N == Option && TICKS_NONE != TimeOut)) {
+	if (unlikely(options == _0_TO_N && timeout != TICKS_NONE)) {
 		return RC_FAIL;
 	}
 
 	A.priority = _k_current_task->priority;
 	A.Comm = _K_SVC_PIPE_PUT_REQUEST;
-	A.Time.ticks = TimeOut;
+	A.Time.ticks = timeout;
 
-	A.args.pipe_req.req_info.pipe.id = Id;
-	A.args.pipe_req.req_type.sync.total_size = iNbrBytesToWrite;
-	A.args.pipe_req.req_type.sync.data_ptr = pBuffer;
+	A.args.pipe_req.req_info.pipe.id = id;
+	A.args.pipe_req.req_type.sync.total_size = bytes_to_write;
+	A.args.pipe_req.req_type.sync.data_ptr = buffer;
 
-	_k_pipe_option_set(&A.args, Option);
+	_k_pipe_option_set(&A.args, options);
 	_k_pipe_request_type_set(&A.args, _SYNCREQ);
 
 	KERNEL_ENTRY(&A);
 
-	*piNbrBytesWritten = A.args.pipe_ack.xferred_size;
+	*bytes_written = A.args.pipe_ack.xferred_size;
 	return A.Time.rcode;
 }
 
@@ -168,9 +160,11 @@ int _task_pipe_block_put(kpipe_t Id, struct k_block Block,
 	if (unlikely(iSize2Xfer % SIZEOFUNIT_TO_OCTET(1))) {
 		return RC_ALIGNMENT;
 	}
-	if (unlikely(0 == iSize2Xfer)) {
-		/* not allowed because enlisted requests with zero size
-		   will hang in _k_pipe_process() */
+	if (unlikely(iSize2Xfer == 0)) {
+		/*
+		 * not allowed because enlisted requests with zero size
+		 * will hang in _k_pipe_process()
+		 */
 		return RC_FAIL;
 	}
 

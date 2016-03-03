@@ -18,22 +18,23 @@
 
 menu "x86 Core Options"
 
-config NO_ISRS
-	bool
-	prompt "No Asynchronous Interrupts"
-	default n
-	help
-	This option disables asynchronous interrupts support.
-
-
-config NO_NESTED_INTERRUPTS
+config NESTED_INTERRUPTS
 	bool
 	prompt "Enable nested interrupts"
-	default n
-	depends on X86_32
+	default y
 	help
-	disable nest interrupts.
+	This option enables support for nested interrupts.
 
+config EXCEPTION_DEBUG
+	bool
+	prompt "Unhandled exception debugging"
+	default y
+	depends on PRINTK
+	help
+	Install handlers for various CPU exception/trap vectors to
+	make debugging them easier, at a small expense in code size.
+	This prints out the specific exception vector and any associated
+	error codes.
 
 menu "Memory Layout Options"
 
@@ -42,19 +43,22 @@ config IDT_NUM_VECTORS
 	prompt "Number of IDT vectors"
 	default 256
 	range 32 256
-	depends on !NO_ISRS
 	help
 	This option specifies the number of interrupt vector entries in the
 	Interrupt Descriptor Table (IDT). By default all 256 vectors are
 	supported in an IDT requiring 2048 bytes of memory.
 
-config NUM_GDT_SPARE_ENTRIES
+config MAX_IRQ_LINES
 	int
-	prompt "Number of spare GDT entries"
-	default 0
+	prompt "Number of IRQ lines"
+	default 128
+	range 0 256
 	help
-	This option specifies the number of spare entries in the Global
-	Descriptor Table (GDT).
+	This option specifies the number of IRQ lines in the system.
+	It can be tuned to save some bytes in ROM, as it determines the
+	size of the _irq_to_interrupt_vector_table, which is used at runtime
+	to program to the PIC the association between vectors and
+	interrupts.
 
 config PHYS_LOAD_ADDR
 	hex "Physical load address"
@@ -62,20 +66,40 @@ config PHYS_LOAD_ADDR
 	help
 	This option specifies the physical address where the kernel is loaded.
 
-endmenu
+config PHYS_RAM_ADDR
+        hex "Physical RAM address"
+	# Default value must be supplied by platform
+        help
+        This option specifies the physical RAM address of the selected SoC.
 
-choice
-prompt "Reboot implementation"
-default REBOOT_RST_CNT
-depends on REBOOT
-
-config REBOOT_RST_CNT
-	bool
-	prompt "Use the RST_CNT register"
+config RAM_SIZE
+	int "Amount of RAM given to the kernel (in kB)"
 	help
-	Reboot using the legacy method of writing to the RST_CNT register
-	(I/O port 0xcf9). A cold reboot is performed, going back to the BIOS.
+	This option specifies the amount of RAM given to the kernel. It must
+	not exceed the amount available on the target.  When running an XIP
+	kernel, it must be large enough to contain the data, bss and noinit
+	sections.  When not running an XIP kernel, it must be large enough to
+	contain the full image.
 
-endchoice
+	The default value is specified by the platform.
+
+config ROM_SIZE
+	int "Amount of ROM given to the kernel (in kB)" if XIP
+	help
+	This option specifies the amount of ROM given to the kernel. It must
+	not exceed the amount available on the target.  It must also be large
+	enough to contain the full image.
+
+	The default value is specified by the platform.
+
+config GDT_DYNAMIC
+	bool
+	prompt "Store GDT in RAM so that it can be modified"
+	default n
+	help
+	This option stores the GDT in RAM instead of ROM, so that it may
+	be modified at runtime at the expense of some memory.
+
+endmenu
 
 endmenu

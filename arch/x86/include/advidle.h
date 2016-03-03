@@ -15,20 +15,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
-DESCRIPTION
-This header file specifies the custom advanced idle management interface.
-All of the APIs declared here must be supplied by the custom advanced idle
-management system, namely the _AdvIdleCheckSleep(), _AdvIdleFunc()
-and _AdvIdleStart() functions.
+
+/**
+ * @brief Custom advanced idle manager
+ *
+ * This header file specifies the custom advanced idle management interface.
+ * All of the APIs declared here must be supplied by the custom advanced idle
+ * management system, namely the _AdvIdleCheckSleep(), _AdvIdleFunc()
+ * and _AdvIdleStart() functions.
  */
 
 #ifndef __INCadvidle
 #define __INCadvidle
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef CONFIG_ADVANCED_IDLE
 
-/*
+/**
  * @brief Determine if advanced sleep has occurred
  *
  * This routine checks if the system is recovering from advanced
@@ -37,10 +43,9 @@ and _AdvIdleStart() functions.
  * @return 0 if the system is cold booting on a non-zero
  * value if the system is recovering from advanced sleep.
  */
-
 extern int _AdvIdleCheckSleep(void);
 
-/*
+/**
  * @brief Continue kernel start-up or awaken kernel from sleep
  *
  * This routine checks if the system is recovering from advanced sleep and
@@ -49,16 +54,15 @@ extern int _AdvIdleCheckSleep(void);
  * passes to the _AdvIdleFunc() that put the system to sleep, which then
  * finishes executing.
  *
+ * @param _Cstart the address of the _Cstart function
+ * @param _gdt the address of the global descriptor table in RAM
+ * @param _GlobalTss the address of the TSS descriptor
+ *
  * @return does not return to caller
  */
+extern void _AdvIdleStart(void (*_Cstart)(void), void *_gdt, void *_GlobalTss);
 
-extern void _AdvIdleStart(
-	void (*_Cstart)(void), /* addr of _Cstart function */
-	void *_gdt,	    /* addr of global descriptor table in RAM */
-	void *_GlobalTss       /* addr of TSS descriptor */
-	);
-
-/*
+/**
  * @brief Perform advanced sleep
  *
  * This routine checks if the upcoming kernel idle interval is sufficient to
@@ -66,12 +70,16 @@ extern void _AdvIdleStart(
  * to sleep and then later allows it to resume processing; if not, the routine
  * returns immediately without sleeping.
  *
+ * @param ticks the upcoming kernel idle time
+ *
  * @return  non-zero if advanced sleep occurred; otherwise zero
  */
-
-extern int _AdvIdleFunc(int32_t ticks /* upcoming kernel idle time */
-			);
+extern int _AdvIdleFunc(int32_t ticks);
 
 #endif /* CONFIG_ADVANCED_IDLE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __INCadvidle */

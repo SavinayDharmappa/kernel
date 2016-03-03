@@ -1,5 +1,3 @@
-/* uart_console.c - UART-driven console */
-
 /*
  * Copyright (c) 2011-2012, 2014-2015 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-  DESCRIPTION
-
-  Serial console driver.
-  Hooks into the printk and fputc (for printf) modules. Poll driven.
+/**
+ * @file
+ * @brief UART-driven console
+ *
+ *
+ * Serial console driver.
+ * Hooks into the printk and fputc (for printf) modules. Poll driven.
  */
 
 #include <nanokernel.h>
@@ -29,18 +29,24 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
+#include <ctype.h>
 
 #include <device.h>
 #include <init.h>
 
 #include <board.h>
-#include <drivers/uart.h>
+#include <uart.h>
 #include <console/uart_console.h>
 #include <toolchain.h>
 #include <sections.h>
+#include <atomic.h>
+#include <misc/printk.h>
+
 #ifdef CONFIG_GDB_SERVER
-#include <debug/gdb_server.h>
+#include <misc/debug/gdb_server.h>
 #endif
+
+static struct device *uart_console_dev;
 
 #if 0 /* NOTUSED */
 /**
@@ -50,17 +56,14 @@
  * @return the character or EOF if nothing present
  */
 
-static int consoleIn(void)
+static int console_in(void)
 {
-#ifdef UART_CONSOLE_DEV
 	unsigned char c;
-	if (uart_poll_in(UART_CONSOLE_DEV, &c) < 0)
+
+	if (uart_poll_in(uart_console_dev, &c) < 0)
 		return EOF;
 	else
 		return (int)c;
-#else
-	return 0;
-#endif
 }
 #endif
 
@@ -71,25 +74,23 @@ static int consoleIn(void)
  *
  * Outputs both line feed and carriage return in the case of a '\n'.
  *
+ * @param c Character to output
+ *
  * @return The character passed as input.
  */
 
-static int consoleOut(int c /* character to output */
-	)
+static int console_out(int c)
 {
 #ifdef CONFIG_GDB_SERVER
 	if (gdb_console_out (c)) return c;
 #endif
-#ifdef UART_CONSOLE_DEV
-	uart_poll_out(UART_CONSOLE_DEV, (unsigned char)c);
+	uart_poll_out(uart_console_dev, (unsigned char)c);
 	if ('\n' == c) {
-		uart_poll_out(UART_CONSOLE_DEV, (unsigned char)'\r');
+		uart_poll_out(uart_console_dev, (unsigned char)'\r');
 	}
 	return c;
-#else
-	return 0;
-#endif
 }
+
 #endif
 
 #if defined(CONFIG_STDOUT_CONSOLE)
@@ -109,10 +110,19 @@ extern void __printk_hook_install(int (*fn)(int));
 #endif
 
 #if defined(CONFIG_CONSOLE_HANDLER)
-static size_t pos = 0;
-
 static struct nano_fifo *avail_queue;
 static struct nano_fifo *lines_queue;
+
+/* Control characters */
+#define ESC                0x1b
+#define DEL                0x7f
+
+/* ANSI escape sequences */
+#define ANSI_ESC           '['
+#define ANSI_UP            'A'
+#define ANSI_DOWN          'B'
+#define ANSI_FORWARD       'C'
+#define ANSI_BACKWARD      'D'
 
 static int read_uart(struct device *uart, uint8_t *buf, unsigned int size)
 {
@@ -129,74 +139,256 @@ static int read_uart(struct device *uart, uint8_t *buf, unsigned int size)
 	return rx;
 }
 
+static inline void cursor_forward(unsigned int count)
+{
+	printk("\x1b[%uC", count);
+}
+
+static inline void cursor_backward(unsigned int count)
+{
+	printk("\x1b[%uD", count);
+}
+
+static inline void cursor_save(void)
+{
+	printk("\x1b[s");
+}
+
+static inline void cursor_restore(void)
+{
+	printk("\x1b[u");
+}
+
+static void insert_char(char *pos, char c, uint8_t end)
+{
+	char tmp;
+
+	/* Echo back to console */
+	uart_poll_out(uart_console_dev, c);
+
+	if (end == 0) {
+		*pos = c;
+		return;
+	}
+
+	tmp = *pos;
+	*(pos++) = c;
+
+	cursor_save();
+
+	while (end-- > 0) {
+		uart_poll_out(uart_console_dev, tmp);
+		c = *pos;
+		*(pos++) = tmp;
+		tmp = c;
+	}
+
+	/* Move cursor back to right place */
+	cursor_restore();
+}
+
+static void del_char(char *pos, uint8_t end)
+{
+	uart_poll_out(uart_console_dev, '\b');
+
+	if (end == 0) {
+		uart_poll_out(uart_console_dev, ' ');
+		uart_poll_out(uart_console_dev, '\b');
+		return;
+	}
+
+	cursor_save();
+
+	while (end-- > 0) {
+		*pos = *(pos + 1);
+		uart_poll_out(uart_console_dev, *(pos++));
+	}
+
+	uart_poll_out(uart_console_dev, ' ');
+
+	/* Move cursor back to right place */
+	cursor_restore();
+}
+
+enum {
+	ESC_ESC,
+	ESC_ANSI,
+	ESC_ANSI_FIRST,
+	ESC_ANSI_VAL,
+	ESC_ANSI_VAL_2
+};
+
+static atomic_t esc_state;
+static unsigned int ansi_val, ansi_val_2;
+static uint8_t cur, end;
+
+static void handle_ansi(uint8_t byte)
+{
+	if (atomic_test_and_clear_bit(&esc_state, ESC_ANSI_FIRST)) {
+		if (!isdigit(byte)) {
+			ansi_val = 1;
+			goto ansi_cmd;
+		}
+
+		atomic_set_bit(&esc_state, ESC_ANSI_VAL);
+		ansi_val = byte - '0';
+		ansi_val_2 = 0;
+		return;
+	}
+
+	if (atomic_test_bit(&esc_state, ESC_ANSI_VAL)) {
+		if (isdigit(byte)) {
+			if (atomic_test_bit(&esc_state, ESC_ANSI_VAL_2)) {
+				ansi_val_2 *= 10;
+				ansi_val_2 += byte - '0';
+			} else {
+				ansi_val *= 10;
+				ansi_val += byte - '0';
+			}
+			return;
+		}
+
+		/* Multi value sequence, e.g. Esc[Line;ColumnH */
+		if (byte == ';' &&
+		    !atomic_test_and_set_bit(&esc_state, ESC_ANSI_VAL_2)) {
+			return;
+		}
+
+		atomic_clear_bit(&esc_state, ESC_ANSI_VAL);
+		atomic_clear_bit(&esc_state, ESC_ANSI_VAL_2);
+	}
+
+ansi_cmd:
+	switch (byte) {
+	case ANSI_BACKWARD:
+		if (ansi_val > cur) {
+			break;
+		}
+
+		end += ansi_val;
+		cur -= ansi_val;
+		cursor_backward(ansi_val);
+		break;
+	case ANSI_FORWARD:
+		if (ansi_val > end) {
+			break;
+		}
+
+		end -= ansi_val;
+		cur += ansi_val;
+		cursor_forward(ansi_val);
+		break;
+	default:
+		break;
+	}
+
+	atomic_clear_bit(&esc_state, ESC_ANSI);
+}
+
 void uart_console_isr(void *unused)
 {
 	ARG_UNUSED(unused);
 
-	while (uart_irq_update(UART_CONSOLE_DEV)
-	       && uart_irq_is_pending(UART_CONSOLE_DEV)) {
+	while (uart_irq_update(uart_console_dev) &&
+	       uart_irq_is_pending(uart_console_dev)) {
+		static struct uart_console_input *cmd;
+		uint8_t byte;
+		int rx;
+
+		if (!uart_irq_rx_ready(uart_console_dev)) {
+			continue;
+		}
+
 		/* Character(s) have been received */
-		if (uart_irq_rx_ready(UART_CONSOLE_DEV)) {
-			static struct uart_console_input *cmd;
-			uint8_t byte;
-			int rx;
 
-			rx = read_uart(UART_CONSOLE_DEV, &byte, 1);
-			if (rx < 0) {
+		rx = read_uart(uart_console_dev, &byte, 1);
+		if (rx < 0) {
+			return;
+		}
+
+		if (uart_irq_input_hook(uart_console_dev, byte) != 0) {
+			/*
+			 * The input hook indicates that no further processing
+			 * should be done by this handler.
+			 */
+			return;
+		}
+
+		if (!cmd) {
+			cmd = nano_isr_fifo_get(avail_queue, TICKS_NONE);
+			if (!cmd)
 				return;
+		}
+
+		/* Handle ANSI escape mode */
+		if (atomic_test_bit(&esc_state, ESC_ANSI)) {
+			handle_ansi(byte);
+			continue;
+		}
+
+		/* Handle escape mode */
+		if (atomic_test_and_clear_bit(&esc_state, ESC_ESC)) {
+			switch (byte) {
+			case ANSI_ESC:
+				atomic_set_bit(&esc_state, ESC_ANSI);
+				atomic_set_bit(&esc_state, ESC_ANSI_FIRST);
+				break;
+			default:
+				break;
 			}
 
-			if (uart_irq_input_hook(UART_CONSOLE_DEV, byte) != 0) {
-				/*
-				 * The input hook indicates that no further processing
-				 * should be done by this handler.
-				 */
-				return;
-			}
+			continue;
+		}
 
-			if (!cmd) {
-				cmd = nano_isr_fifo_get(avail_queue);
-				if (!cmd)
-					return;
-			}
-
-			/* Echo back to console */
-			uart_poll_out(UART_CONSOLE_DEV, byte);
-
-			if (byte == '\r' || byte == '\n' ||
-			    pos == sizeof(cmd->line) - 1) {
-				cmd->line[pos] = '\0';
-				uart_poll_out(UART_CONSOLE_DEV, '\n');
-				pos = 0;
-
+		/* Handle special control characters */
+		if (!isprint(byte)) {
+			switch (byte) {
+			case DEL:
+				if (cur > 0) {
+					del_char(&cmd->line[--cur], end);
+				}
+				break;
+			case ESC:
+				atomic_set_bit(&esc_state, ESC_ESC);
+				break;
+			case '\r':
+				cmd->line[cur + end] = '\0';
+				uart_poll_out(uart_console_dev, '\n');
+				cur = 0;
+				end = 0;
 				nano_isr_fifo_put(lines_queue, cmd);
 				cmd = NULL;
-			} else {
-				cmd->line[pos++] = byte;
+				break;
+			default:
+				break;
 			}
 
+			continue;
+		}
+
+		/* Ignore characters if there's no more buffer space */
+		if (cur + end < sizeof(cmd->line) - 1) {
+			insert_char(&cmd->line[cur++], byte, end);
 		}
 	}
 }
-
-IRQ_CONNECT_STATIC(console, CONFIG_UART_CONSOLE_IRQ,
-		   CONFIG_UART_CONSOLE_INT_PRI, uart_console_isr, 0);
 
 static void console_input_init(void)
 {
 	uint8_t c;
 
-	uart_irq_rx_disable(UART_CONSOLE_DEV);
-	uart_irq_tx_disable(UART_CONSOLE_DEV);
-	IRQ_CONFIG(console, uart_irq_get(UART_CONSOLE_DEV));
-	irq_enable(uart_irq_get(UART_CONSOLE_DEV));
+	uart_irq_rx_disable(uart_console_dev);
+	uart_irq_tx_disable(uart_console_dev);
+	IRQ_CONNECT(CONFIG_UART_CONSOLE_IRQ, CONFIG_UART_CONSOLE_IRQ_PRI,
+		    uart_console_isr, 0, UART_IRQ_FLAGS);
+	irq_enable(CONFIG_UART_CONSOLE_IRQ);
 
 	/* Drain the fifo */
-	while (uart_irq_rx_ready(UART_CONSOLE_DEV)) {
-		uart_fifo_read(UART_CONSOLE_DEV, &c, 1);
+	while (uart_irq_rx_ready(uart_console_dev)) {
+		uart_fifo_read(uart_console_dev, &c, 1);
 	}
 
-	uart_irq_rx_enable(UART_CONSOLE_DEV);
+	uart_irq_rx_enable(uart_console_dev);
 }
 
 void uart_register_input(struct nano_fifo *avail, struct nano_fifo *lines)
@@ -224,8 +416,8 @@ void uart_register_input(struct nano_fifo *avail, struct nano_fifo *lines)
 
 void uart_console_hook_install(void)
 {
-	__stdout_hook_install(consoleOut);
-	__printk_hook_install(consoleOut);
+	__stdout_hook_install(console_out);
+	__printk_hook_install(console_out);
 }
 
 /**
@@ -238,9 +430,18 @@ static int uart_console_init(struct device *arg)
 {
 	ARG_UNUSED(arg);
 
+	uart_console_dev = device_get_binding(CONFIG_UART_CONSOLE_ON_DEV_NAME);
+
 	uart_console_hook_install();
 
 	return DEV_OK;
 }
-DECLARE_DEVICE_INIT_CONFIG(uart_console, "", uart_console_init, NULL);
-pre_kernel_late_init(uart_console, NULL);
+
+/* UART consloe initializes after the UART device itself */
+SYS_INIT(uart_console_init,
+#if defined(CONFIG_EARLY_CONSOLE)
+			PRIMARY,
+#else
+			SECONDARY,
+#endif
+			CONFIG_UART_CONSOLE_PRIORITY);

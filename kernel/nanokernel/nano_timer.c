@@ -18,27 +18,21 @@
 
 #include <nano_private.h>
 
-struct nano_timer *_nano_timer_list = NULL;
+struct nano_timer *_nano_timer_list;
 
 
 void nano_timer_init(struct nano_timer *timer, void *data)
 {
 	nano_lifo_init(&timer->lifo);
 	timer->userData = data;
+	DEBUG_TRACING_OBJ_INIT(struct nano_timer *, timer, _track_list_nano_timer);
 }
 
 
+FUNC_ALIAS(_timer_start, nano_isr_timer_start, void);
 FUNC_ALIAS(_timer_start, nano_fiber_timer_start, void);
-
-/**
- * @brief Start a nanokernel timer from a task
- *
- * This function starts a previously initialized nanokernel timer object.
- * The timer will expire in <ticks> system clock ticks.
- *
- * @return N/A
- */
 FUNC_ALIAS(_timer_start, nano_task_timer_start, void);
+FUNC_ALIAS(_timer_start, nano_timer_start, void);
 
 /**
  *
@@ -51,7 +45,8 @@ FUNC_ALIAS(_timer_start, nano_task_timer_start, void);
  */
 void _timer_start(struct nano_timer *timer, /* timer to start */
 				       int ticks /* number of system ticks
-						    before expiry */
+						  * before expiry
+						  */
 				       )
 {
 	unsigned int imask;
@@ -127,14 +122,17 @@ static void _timer_stop(struct nano_timer *timer)
 }
 
 
-void nano_fiber_timer_stop(struct nano_timer *timer)
+FUNC_ALIAS(_timer_stop_non_preemptible, nano_isr_timer_stop, void);
+FUNC_ALIAS(_timer_stop_non_preemptible, nano_fiber_timer_stop, void);
+void _timer_stop_non_preemptible(struct nano_timer *timer)
 {
+	extern void _lifo_put_non_preemptible(struct nano_lifo *lifo, void *data);
 
 	_timer_stop(timer);
 
 	/* if there was a waiter, kick it */
 	if (timer->lifo.wait_q.head) {
-		nano_fiber_lifo_put(&timer->lifo, (void *)0);
+		_lifo_put_non_preemptible(&timer->lifo, (void *)0);
 	}
 }
 
@@ -149,24 +147,13 @@ void nano_task_timer_stop(struct nano_timer *timer)
 	}
 }
 
-
-void *nano_fiber_timer_test(struct nano_timer *timer)
+void nano_timer_stop(struct nano_timer *timer)
 {
-	return nano_fiber_lifo_get(&timer->lifo);
-}
+	static void (*func[3])(struct nano_timer *) = {
+		nano_isr_timer_stop,
+		nano_fiber_timer_stop,
+		nano_task_timer_stop,
+	};
 
-
-void *nano_fiber_timer_wait(struct nano_timer *timer)
-{
-	return nano_fiber_lifo_get_wait(&timer->lifo);
-}
-
-void *nano_task_timer_test(struct nano_timer *timer)
-{
-	return nano_task_lifo_get(&timer->lifo);
-}
-
-void *nano_task_timer_wait(struct nano_timer *timer)
-{
-	return nano_task_lifo_get_wait(&timer->lifo);
+	func[sys_execution_context_type_get()](timer);
 }

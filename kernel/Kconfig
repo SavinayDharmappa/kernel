@@ -34,16 +34,14 @@ config SYS_CLOCK_TICKS_PER_SEC
 	int
 	prompt "System tick frequency (in ticks/second)"
 	default 100
-	depends on !NO_ISRS
 	help
 	This option specifies the frequency of the system clock in Hz.
 
 config SYS_CLOCK_HW_CYCLES_PER_SEC
 	int "System clock's h/w timer frequency"
-	default 0
 	help
 	This option specifies the frequency of the hardware timer used for the
-	system clock (in Hz). It is normally set by the platform's defconfig file
+	system clock (in Hz). This option is set by the platform's Kconfig file
 	and the user should generally avoid modifying it via the menu configuration.
 
 config  SYS_CLOCK_EXISTS
@@ -94,51 +92,64 @@ config EVENT_LOGGER
 	Enable event logging feature. Allow the usage of a ring buffer to
 	transmit event messages with a single interface to collect them.
 
-config KERNEL_PROFILER
+config KERNEL_EVENT_LOGGER
 	bool
-	prompt "Enable profiler features"
+	prompt "Enable kernel event logger features"
 	default n
 	select EVENT_LOGGER
 	help
 	This feature enables the usage of the profiling logger. Provides the
 	logging of sleep events (either entering or leaving low power conditions),
 	context switch events, interrupt events, boot events and a method to
-	collect these profile messages.
+	collect these event messages.
 
-config PROFILER_BUFFER_SIZE
+config KERNEL_EVENT_LOGGER_BUFFER_SIZE
 	int
-	prompt "Profiler buffer size"
+	prompt "Kernel event logger buffer size"
 	default 128
-	depends on KERNEL_PROFILER
+	depends on KERNEL_EVENT_LOGGER
 	help
 	Buffer size in 32-bit words.
 
+config KERNEL_INIT_PRIORITY_DEFAULT
+	int
+	prompt "Default init priority"
+	help
+	Defaut minimal init priority for each init level.
 
-menu "Profiler points"
-depends on KERNEL_PROFILER
+config KERNEL_INIT_PRIORITY_DEVICE
+	int
+	prompt "Default init priority for device drivers"
+	help
+	Device driver, that depends on common components, such as
+	interrupt controller, but does not depend on other devices,
+	uses this init priority.
 
-config PROFILER_CONTEXT_SWITCH
+menu "Kernel event logging points"
+depends on KERNEL_EVENT_LOGGER
+
+config KERNEL_EVENT_LOGGER_CONTEXT_SWITCH
 	bool
-	prompt "Context switch profiler point"
+	prompt "Context switch event logging point"
 	default n
-	depends on KERNEL_PROFILER
+	depends on KERNEL_EVENT_LOGGER
 	help
 	Enable the context switch event messages.
 
-config PROFILER_INTERRUPT
+config KERNEL_EVENT_LOGGER_INTERRUPT
 	bool
-	prompt "Interrupt profiler point"
+	prompt "Interrupt event logging point"
 	default n
-	depends on KERNEL_PROFILER
+	depends on KERNEL_EVENT_LOGGER
 	help
 	Enable interrupt event messages. These messages provide the following
 	information: The time when interrupts occur.
 
-config PROFILER_SLEEP
+config KERNEL_EVENT_LOGGER_SLEEP
 	bool
-	prompt "Sleep profiler point"
+	prompt "Sleep event logging point"
 	default n
-	depends on KERNEL_PROFILER && ADVANCED_POWER_MANAGEMENT
+	depends on KERNEL_EVENT_LOGGER && ((MICROKERNEL && ADVANCED_POWER_MANAGEMENT) || NANOKERNEL)
 	help
 	Enable low power condition event messages. These messages provide the
 	following information:
@@ -148,14 +159,6 @@ config PROFILER_SLEEP
 endmenu
 
 menu "Security Options"
-
-config CUSTOM_SECURITY
-	bool
-	prompt "Customized security"
-	default n
-	help
-	This option allow users to disable enhanced security features they do
-	not wish to use or enable the use of features with security exposures.
 
 config STACK_CANARIES
 	bool
@@ -179,27 +182,71 @@ endmenu
 endmenu
 source "kernel/nanokernel/Kconfig"
 
+config ADVANCED_POWER_MANAGEMENT
+	bool
+	prompt "Advanced power management"
+	default n
+	help
+	This option enables the platform to implement extra power management
+	policies whenever the kernel becomes idle. The kernel invokes
+	_sys_power_save_idle() to inform the power management subsystem of the
+	number of ticks until the next kernel timer is due to expire.
+
+menu "Advanced Power Management Features"
+	depends on ADVANCED_POWER_MANAGEMENT
+
+config  ADVANCED_IDLE
+	bool
+	prompt "Advanced idle state"
+	default n
+	depends on MICROKERNEL && ADVANCED_POWER_MANAGEMENT && ADVANCED_IDLE_SUPPORTED
+	help
+	This option enables the kernel to interface to a custom advanced idle
+	power saving manager. This permits the system to enter a custom
+	power saving state when the kernel becomes idle for extended periods,
+	and then to restore the system to its previous state (rather than
+	booting up from scratch) when the kernel is re-activated.
+
+config ADV_IDLE_STACK_SIZE
+	int
+	prompt "Advanced idle state stack size"
+	default 16
+	depends on ADVANCED_IDLE
+	help
+	This option defines the size of the separate stack used during the
+	system state check while the booting up. A separate stack is used
+	to avoid memory corruption on the system re-activation from power
+	down mode. The stack size must be large enough to hold the return
+	address (4 bytes) and the _AdvIdleCheckSleep() stack frame.
+
 config TICKLESS_IDLE
 	bool
 	prompt "Tickless idle"
 	default y
-	depends on ADVANCED_POWER_MANAGEMENT
+	depends on MICROKERNEL || NANOKERNEL_TICKLESS_IDLE_SUPPORTED
 	help
 	This option suppresses periodic system clock interrupts whenever the
 	kernel becomes idle. This permits the system to remain in a power
 	saving state for extended periods without having to wake up to
 	service each tick as it occurs.
 
+	As a policy, an architecture should always provide support for tickless in
+	the microkernel. If an architecture also provides support for nanokernel
+	systems, it must select the NANOKERNEL_TICKLESS_IDLE_SUPPORTED kconfig
+	option.
+
 config TICKLESS_IDLE_THRESH
 	int
 	prompt "Tickless idle threshold"
 	default 3
-	depends on TICKLESS_IDLE && MICROKERNEL
+	depends on TICKLESS_IDLE
 	help
-	This option disables clock interrupt suppression when the kernel idles
+	This option enables clock interrupt suppression when the kernel idles
 	for only a short period of time. It specifies the minimum number of
 	ticks that must occur before the next kernel timer expires in order
 	for suppression to happen.
+
+endmenu
 
 if MICROKERNEL
 source "kernel/microkernel/Kconfig"

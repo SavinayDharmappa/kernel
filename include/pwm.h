@@ -22,6 +22,13 @@
 #ifndef __PWM_H__
 #define __PWM_H__
 
+/**
+ * @brief PWM Interface
+ * @defgroup pwm_interface PWM Interface
+ * @ingroup io_interfaces
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -40,6 +47,8 @@ typedef int (*pwm_set_values_t)(struct device *dev, int access_op,
 				uint32_t pwm, uint32_t on, uint32_t off);
 typedef int (*pwm_set_duty_cycle_t)(struct device *dev, int access_op,
 				    uint32_t pwm, uint8_t duty);
+typedef int (*pwm_set_phase_t)(struct device *dev, int access_op,
+				    uint32_t pwm, uint8_t phase);
 typedef int (*pwm_suspend_dev_t)(struct device *dev);
 typedef int (*pwm_resume_dev_t)(struct device *dev);
 
@@ -47,6 +56,7 @@ struct pwm_driver_api {
 	pwm_config_t config;
 	pwm_set_values_t set_values;
 	pwm_set_duty_cycle_t set_duty_cycle;
+	pwm_set_phase_t set_phase;
 	pwm_suspend_dev_t suspend;
 	pwm_resume_dev_t resume;
 };
@@ -193,5 +203,9 @@ static inline int pwm_resume(struct device *dev)
 #ifdef __cplusplus
 }
 #endif
+
+/**
+ * @}
+ */
 
 #endif /* __PWM_H__ */

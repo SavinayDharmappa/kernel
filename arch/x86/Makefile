@@ -1,34 +1,29 @@
-
-
 PERF_OPT=$(if $(filter -Os,$(KBUILD_CFLAGS)),,y)
 
 cflags-y += $(call cc-option,-ffunction-sections,) $(call cc-option,-fdata-sections,)
 ifeq ($(PERF_OPT),y)
 cflags-y += -DPERF_OPT
 else
-cflags-y += $(call cc-option,-mpreferred-stack-boundary=2)
+PREFERRED_STACK_BOUNDARY = y
+endif
+
+ifeq ($(COMPILER),clang)
+biarch := $(call cc-option,-m32)
+KBUILD_AFLAGS += $(biarch)
+KBUILD_CFLAGS += $(biarch)
+else
+cflags-$(PREFERRED_STACK_BOUNDARY) += $(call cc-option,-mpreferred-stack-boundary=2)
 endif
 cflags-$(CONFIG_LTO) += $(call cc-option,-flto,)
-
 
 ifneq ($(CONFIG_SSE_FP_MATH),y)
 cflags-y += -mno-sse
 endif
 
-arch-$(CONFIG_CPU_ATOM) += $(call cc-option,-march=atom) \
-	$(call cc-option,-mtune=atom,$(call cc-option,-mtune=generic))
-arch-$(CONFIG_CPU_MINUTEIA) += $(call cc-option,-march=pentium)
+include $(srctree)/arch/$(ARCH)/soc/$(SOC_NAME)/Makefile
 
-ifeq ($(CONFIG_STACK_CANARIES),y)
-cflags-y  += $(call cc-option,-fstack-protector-all,)
-else
-cflags-y += $(call cc-option,-fno-stack-protector,)
-endif
-
-
-KBUILD_CFLAGS += $(cflags-y) $(arch-y)
-KBUILD_AFLAGS += $(arch-y)
-
+KBUILD_CXXFLAGS += $(cflags-y)
+KBUILD_CFLAGS += $(cflags-y)
 
 QEMU_BIOS ?= /usr/share/qemu
 QEMU_CPU_TYPE_x86 = qemu32

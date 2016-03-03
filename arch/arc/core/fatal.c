@@ -1,5 +1,3 @@
-/* fatal.c - fatal fault handling */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements the routines necessary for handling fatal faults on
-ARCv2 CPUs.
+/**
+ * @file
+ * @brief Fatal fault handling
+ *
+ * This module implements the routines necessary for handling fatal faults on
+ * ARCv2 CPUs.
  */
 
 #include <nano_private.h>
@@ -52,10 +52,7 @@ const NANO_ESF _default_esf = {
  * create its own or use a pointer to the global default ESF <_default_esf>.
  *
  * @return This function does not return.
- *
- * \NOMANUAL
  */
-
 FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
 							const NANO_ESF *pEsf)
 {

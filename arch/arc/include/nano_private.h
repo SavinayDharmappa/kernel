@@ -1,5 +1,3 @@
-/* nano_private.h - private nanokernel definitions */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,15 +14,17 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This file contains private nanokernel structures definitions and various other
-definitions for the ARCv2 processor architecture.
-
-This file is also included by assembly language files which must #define
-_ASMLANGUAGE before including this header file.  Note that nanokernel assembly
-source files obtains structure offset values via "absolute symbols" in the
-offsets.o module.
+/**
+ * @file
+ * @brief Private nanokernel definitions
+ *
+ * This file contains private nanokernel structures definitions and various
+ * other definitions for the ARCv2 processor architecture.
+ *
+ * This file is also included by assembly language files which must #define
+ * _ASMLANGUAGE before including this header file.  Note that nanokernel
+ * assembly source files obtains structure offset values via "absolute
+ * symbols" in the offsets.o module.
  */
 
 #ifndef _NANO_PRIVATE_H
@@ -37,6 +37,7 @@ extern "C" {
 #include <toolchain.h>
 #include <sections.h>
 #include <arch/cpu.h>
+#include <vector_table.h>
 
 #ifndef _ASMLANGUAGE
 #include <nanokernel.h>            /* public nanokernel API */
@@ -160,15 +161,16 @@ typedef struct firq_regs tFirqRegs;
 #ifndef _ASMLANGUAGE
 
 struct tcs {
-	struct tcs *link;          /* node in singly-linked list
-								* _nanokernel.fibers */
-	uint32_t flags;            /* bitmask of flags above */
-	uint32_t intlock_key;      /* interrupt key when relinquishing control */
-	int relinquish_cause;      /* one of the _CAUSE_xxxx definitions above */
-	unsigned int return_value; /* return value from _Swap */
-	int prio;                  /* fiber priority, -1 for a task */
+	struct tcs *link;         /* node in singly-linked list
+				   * _nanokernel.fibers
+				   */
+	uint32_t flags;           /* bitmask of flags above */
+	uint32_t intlock_key;     /* interrupt key when relinquishing control */
+	int relinquish_cause;     /* one of the _CAUSE_xxxx definitions above */
+	unsigned int return_value;/* return value from _Swap */
+	int prio;                 /* fiber priority, -1 for a task */
 #ifdef CONFIG_THREAD_CUSTOM_DATA
-	void *custom_data;         /* available for custom use */
+	void *custom_data;        /* available for custom use */
 #endif
 	struct coop coopReg;
 	struct preempt preempReg;
@@ -177,6 +179,9 @@ struct tcs {
 #endif
 #ifdef CONFIG_NANO_TIMEOUTS
 	struct _nano_timeout nano_timeout;
+#endif
+#ifdef CONFIG_ERRNO
+	int errno_var;
 #endif
 };
 
@@ -207,6 +212,7 @@ struct s_NANO {
 	struct firq_regs firq_regs;
 #ifdef CONFIG_NANO_TIMEOUTS
 	sys_dlist_t timeout_q;
+	int32_t task_timeout;
 #endif
 };
 
@@ -233,10 +239,7 @@ static ALWAYS_INLINE void nanoArchInit(void)
  * the fiber's thread is stored in its struct tcs structure.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void fiberRtnValueSet(struct tcs *fiber, unsigned int value)
 {
 	fiber->return_value = value;
@@ -247,14 +250,17 @@ static ALWAYS_INLINE void fiberRtnValueSet(struct tcs *fiber, unsigned int value
  * @brief Indicates if kernel is handling interrupt
  *
  * @return 1 if interrupt handler is executed, 0 otherwise
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE int _IS_IN_ISR(void)
 {
 	uint32_t act = _arc_v2_aux_reg_read(_ARC_V2_AUX_IRQ_ACT);
-
+#if CONFIG_IRQ_OFFLOAD
+	/* Check if we're in a TRAP_S exception as well */
+	if (_arc_v2_aux_reg_read(_ARC_V2_STATUS32) & _ARC_V2_STATUS32_AE &&
+	    _ARC_V2_ECR_VECTOR(_arc_v2_aux_reg_read(_ARC_V2_ECR)) == EXC_EV_TRAP) {
+		return 1;
+	}
+#endif
 	return ((act & 0xffff) != 0);
 }
 

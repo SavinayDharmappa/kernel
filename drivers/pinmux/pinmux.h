@@ -21,9 +21,13 @@
 #include <stdint.h>
 #include <device.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct pin_config {
 	uint8_t pin_num;
-	uint8_t mode;
+	uint32_t mode;
 };
 
 struct pinmux_config {
@@ -31,6 +35,10 @@ struct pinmux_config {
 };
 
 extern int pinmux_initialize(struct device *port);
-extern int pinmux_galileo_initialize(struct device *port);
+extern int pinmux_frdm_k64_initialize(struct device *port);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __DRIVERS_PINMUX_H */

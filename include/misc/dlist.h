@@ -1,5 +1,3 @@
-/* dlist.h - doubly-linked list inline implementation */
-
 /*
  * Copyright (c) 2013-2015 Wind River Systems, Inc.
  *
@@ -16,19 +14,25 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Doubly-linked list implementation.
-
-The lists are expected to be initialized such that both the head and tail
-pointers point to the list itself.  Initializing the lists in such a fashion
-simplifies the adding and removing of nodes to/from the list.
+/**
+ * @file
+ * @brief Doubly-linked list inline implementation
+ *
+ * Doubly-linked list implementation.
+ *
+ * The lists are expected to be initialized such that both the head and tail
+ * pointers point to the list itself.  Initializing the lists in such a fashion
+ * simplifies the adding and removing of nodes to/from the list.
  */
 
 #ifndef _misc_dlist__h_
 #define _misc_dlist__h_
 
 #include <stddef.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct _dnode {
 	union {
@@ -49,7 +53,7 @@ typedef struct _dnode sys_dnode_t;
  *
  * @param list the doubly-linked list
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_init(sys_dlist_t *list)
@@ -122,7 +126,7 @@ static inline sys_dnode_t *sys_dlist_peek_head(sys_dlist_t *list)
  */
 
 static inline sys_dnode_t *sys_dlist_peek_next(sys_dlist_t *list,
-												sys_dnode_t *node)
+					       sys_dnode_t *node)
 {
 	return node == list->tail ? NULL : node->next;
 }
@@ -133,7 +137,7 @@ static inline sys_dnode_t *sys_dlist_peek_next(sys_dlist_t *list,
  * @param list the doubly-linked list to operate on
  * @param node the element to append
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_append(sys_dlist_t *list, sys_dnode_t *node)
@@ -151,7 +155,7 @@ static inline void sys_dlist_append(sys_dlist_t *list, sys_dnode_t *node)
  * @param list the doubly-linked list to operate on
  * @param node the element to append
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_prepend(sys_dlist_t *list, sys_dnode_t *node)
@@ -172,7 +176,7 @@ static inline void sys_dlist_prepend(sys_dlist_t *list, sys_dnode_t *node)
  * @param insert_point the insert point in the list: if NULL, insert at head
  * @param node the element to append
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_insert_after(sys_dlist_t *list,
@@ -197,7 +201,7 @@ static inline void sys_dlist_insert_after(sys_dlist_t *list,
  * @param insert_point the insert point in the list: if NULL, insert at tail
  * @param node the element to insert
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_insert_before(sys_dlist_t *list,
@@ -226,7 +230,7 @@ static inline void sys_dlist_insert_before(sys_dlist_t *list,
  *             insert point
  * @param data parameter to cond()
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_insert_at(sys_dlist_t *list, sys_dnode_t *node,
@@ -251,7 +255,7 @@ static inline void sys_dlist_insert_at(sys_dlist_t *list, sys_dnode_t *node,
  *
  * @param node the node to remove
  *
- * @return None
+ * @return N/A
  */
 
 static inline void sys_dlist_remove(sys_dnode_t *node)
@@ -280,5 +284,9 @@ static inline sys_dnode_t *sys_dlist_get(sys_dlist_t *list)
 	sys_dlist_remove(node);
 	return node;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _misc_dlist__h_ */

@@ -33,29 +33,10 @@ extern "C" {
  * @{
  */
 
-#include <microkernel/command_packet.h>
+#include <microkernel/base_api.h>
 
 /* well-known events */
-
-#define TICK_EVENT	0
-/**
- * @cond internal
- */
-/**
- *
- * @brief Test for event request
- *
- * This routine tests an event to see if it has been signaled.
- *
- * @param event Event for which to test.
- * @param time Maximum number of ticks to wait for event.
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-extern int _task_event_recv(kevent_t event, int32_t time);
-/**
- * @endcond
- */
+extern const kevent_t TICK_EVENT;
 
 /**
  *
@@ -118,46 +99,49 @@ extern int task_event_send(kevent_t event);
 
 /**
  *
- * @brief Test for event request
+ * @brief Test for event request with timeout
  *
  * This routine tests an event to see if it has been signaled.
  *
  * @param event Event for which to test.
+ * @param timeout Affects the action taken should the event not yet be
+ * signaled. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. Otherwise wait up to the specified number of
+ * ticks before timing out.
  *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
+ * @retval RC_OK Successfully received signaled event
+ * @retval RC_TIME Timed out while waiting for signaled event
+ * @retval RC_FAIL Failed to immediately receive signaled event when
+ * @a timeout = TICKS_NONE
  */
-#define task_event_recv(event) _task_event_recv(event, TICKS_NONE)
+extern int task_event_recv(kevent_t event, int32_t timeout);
 
-/**
- *
- * @brief Test for event request with wait
- *
- * This routine tests an event to see if it has been signaled.
- *
- * @param event Event for which to test.
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-#define task_event_recv_wait(event) _task_event_recv(event, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-
-/**
- *
- * @brief Test for event request with time out
- *
- * This routine tests an event to see if it has been signaled.
- *
- * @param event Event for which to test.
- * @param time Maximum number of ticks to wait for event.
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-#define task_event_recv_wait_timeout(event, time) _task_event_recv(event, time)
-#endif /* CONFIG_SYS_CLOCK_EXISTS */
 /**
  * @}
  */
+
+#define _K_EVENT_INITIALIZER(handler) \
+	{ \
+		.status = 0, \
+		.func = (kevent_handler_t)handler, \
+		.waiter = NULL, \
+		.count = 0, \
+	}
+
+/**
+ * @brief Define a private microkernel event
+ *
+ * This declares and initializes a private event. The new event
+ * can be passed to the microkernel event functions.
+ *
+ * @param name Name of the event
+ * @param handler Function to handle the event (can be NULL)
+ */
+#define DEFINE_EVENT(name, handler) \
+	struct _k_event_struct _k_event_obj_##name \
+		__in_section(_k_event_list, event, name) = \
+		_K_EVENT_INITIALIZER(handler); \
+	const kevent_t name = (kevent_t)&_k_event_obj_##name;
 
 #ifdef __cplusplus
 }

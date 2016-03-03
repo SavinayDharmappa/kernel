@@ -1,5 +1,3 @@
-/* v2/ffs.h - ARCv2 public nanokernel find-first-set interface */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,13 +14,19 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-ARC-specific nanokernel ffs interface. Included by ARC/arch.h.
+/**
+ * @file
+ * @brief ARCv2 public nanokernel find-first-set interface
+ *
+ * ARC-specific nanokernel ffs interface. Included by ARC/arch.h.
  */
 
 #ifndef _ARCH_ARC_V2_FFS_H_
 #define _ARCH_ARC_V2_FFS_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _ASMLANGUAGE
 
@@ -88,5 +92,9 @@ static ALWAYS_INLINE unsigned int find_lsb_set(uint32_t op)
 #endif
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _ARCH_ARC_V2_FFS_H_ */

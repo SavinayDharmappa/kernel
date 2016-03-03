@@ -1,5 +1,3 @@
-/* scs.c - ARM CORTEX-M Series System Control Space */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Most of the SCS interface consists of simple bit-flipping methods, and is
-implemented as inline functions in scs.h. This module thus contains only data
-definitions and more complex routines, if needed.
+/**
+ * @file
+ * @brief ARM CORTEX-M Series System Control Space
+ *
+ * Most of the SCS interface consists of simple bit-flipping methods, and is
+ * implemented as inline functions in scs.h. This module thus contains only data
+ * definitions and more complex routines, if needed.
  */
 
 #include <nanokernel.h>

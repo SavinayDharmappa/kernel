@@ -1,5 +1,3 @@
-/* Freescale K6x microprocessor MPU register definitions */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,12 +14,14 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module defines the Memory Protection Unit (MPU) Registers for the
-K6x Family of microprocessors.
-NOTE: Not all the registers are currently defined here - only those that are
-currently used.
+/**
+ * @file
+ * @brief Freescale K6x microprocessor MPU register definitions
+ *
+ * This module defines the Memory Protection Unit (MPU) Registers for the K6x
+ * Family of microprocessors.
+ * NOTE: Not all the registers are currently defined here - only those that are
+ * currently used.
  */
 
 #ifndef _K6xMPU_H_
@@ -29,10 +29,14 @@ currently used.
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MPU_VALID_MASK 0x01
 #define MPU_SLV_PORT_ERR_MASK 0xF8
 
-typedef union {
+union CESR {
 	uint32_t value;
 	struct {
 		uint8_t valid : 1 __packed; /* MPU valid/enable */
@@ -45,14 +49,14 @@ typedef union {
 		uint8_t res_24 : 3 __packed; /* RAZ/WI */
 		uint8_t slvPortNErr : 5 __packed; /* slave port N err */
 	} field;
-} CESR_t; /* 0x000 Control/Error Status Register */
+}; /* 0x000 Control/Error Status Register */
 
 #define MPU_NUM_SLV_PORTS 5
 #define MPU_NUM_REGIONS 12
 #define MPU_NUM_WORDS_PER_REGION 4
 
-typedef volatile struct {
-	CESR_t ctrlErrStatus; /* 0x0000 */
+struct K6x_MPU {
+	union CESR ctrlErrStatus; /* 0x0000 */
 	uint32_t errAddr0;    /* 0x0010 */
 	uint32_t errDetail0;  /* 0x0014 */
 	uint32_t errAddr1;    /* 0x0018 */
@@ -66,6 +70,10 @@ typedef volatile struct {
 	uint32_t rgnDesc[MPU_NUM_REGIONS][MPU_NUM_WORDS_PER_REGION]; /* 0x0400
 									*/
 	uint32_t rgnDescAltAccCtrl[MPU_NUM_REGIONS]; /* 0x0800 */
-} K6x_MPU_t; /* K6x Microntroller PMC module */
+}; /* K6x Microntroller PMC module */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _K6xMPU_H_ */

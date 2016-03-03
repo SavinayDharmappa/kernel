@@ -1,5 +1,3 @@
-/* linker.cmd - Linker command/script file */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Linker script for the Cortex-M3 platform.
+/**
+ * @file
+ * @brief Linker command/script file
+ *
+ * Linker script for the Cortex-M3 platform.
  */
 
 #define _LINKER
@@ -27,11 +27,8 @@ Linker script for the Cortex-M3 platform.
 #include <autoconf.h>
 #include <sections.h>
 
+#include <linker-defs.h>
 #include <linker-tool.h>
-
-#define INIT_LEVEL(level)				\
-		__initconfig##level##_start = .;	\
-		*(.initconfig##level##.init)		\
 
 /* physical address of RAM */
 #ifdef CONFIG_XIP
@@ -54,17 +51,19 @@ Linker script for the Cortex-M3 platform.
 
 #define ROM_ADDR CONFIG_FLASH_BASE_ADDRESS
 #define ROM_SIZE CONFIG_FLASH_SIZE*1K
+
 #if defined(CONFIG_XIP)
 	#if defined(CONFIG_IS_BOOTLOADER)
-		#define RAM_SIZE 16K
-		#define RAM_ADDR (CONFIG_SRAM_BASE_ADDRESS + (CONFIG_SRAM_SIZE*1K-16K))
+		#define RAM_SIZE (CONFIG_BOOTLOADER_SRAM_SIZE * 1K)
+		#define RAM_ADDR (CONFIG_SRAM_BASE_ADDRESS + \
+			(CONFIG_SRAM_SIZE * 1K - RAM_SIZE))
 	#else
-		#define RAM_SIZE CONFIG_SRAM_SIZE*1K
+		#define RAM_SIZE CONFIG_SRAM_SIZE * 1K
 		#define RAM_ADDR CONFIG_SRAM_BASE_ADDRESS
 	#endif
 #else
+	#define RAM_SIZE (CONFIG_SRAM_SIZE * 1K - CONFIG_BOOTLOADER_SRAM_SIZE * 1K)
 	#define RAM_ADDR CONFIG_SRAM_BASE_ADDRESS
-	#define RAM_SIZE (CONFIG_SRAM_SIZE*1K - 16K)
 #endif
 
 MEMORY
@@ -99,10 +98,23 @@ SECTIONS
 	KEEP(*(.security_frdm_k64f))
 	KEEP(*(".security_frdm_k64f.*"))
 
-	_image_text_start = .;
+#ifndef CONFIG_SW_ISR_TABLE_DYNAMIC
+	KEEP(*(.isr_irq*))
 
+	/* sections for IRQ0-9 */
+	KEEP(*(SORT(.gnu.linkonce.isr_irq[0-9])))
+
+	/* sections for IRQ10-99 */
+	KEEP(*(SORT(.gnu.linkonce.isr_irq[0-9][0-9])))
+
+	/* sections for IRQ100-999 */
+	KEEP(*(SORT(.gnu.linkonce.isr_irq[0-9][0-9][0-9])))
+#endif
+
+	_image_text_start = .;
 	*(.text)
 	*(".text.*")
+	*(.gnu.linkonce.t.*)
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
 	_image_text_end = .;
@@ -130,27 +142,38 @@ SECTIONS
 	__exidx_end = .;
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
-    SECTION_PROLOGUE(_CTOR_SECTION_NAME,,)
-        {
-        /*
-         * The compiler fills the constructor pointers table below, hence symbol
-         * __CTOR_LIST__ must be aligned on 4 byte boundary.
-         * To align with the C++ standard, the first element of the array
-         * contains the number of actual constructors. The last element is
-         * NULL.
-         */
-        . = ALIGN(4);
-        __CTOR_LIST__ = .;
-        LONG((__CTOR_END__ - __CTOR_LIST__) / 4 - 2)
-        KEEP(*(SORT_BY_NAME(".ctors*")))
-        LONG(0)
-        __CTOR_END__ = .;
-        } GROUP_LINK_IN(ROMABLE_REGION)
+#ifdef CONFIG_CPLUSPLUS
+	SECTION_PROLOGUE(_CTOR_SECTION_NAME,,)
+	{
+	/*
+	 * The compiler fills the constructor pointers table below, hence symbol
+	 * __CTOR_LIST__ must be aligned on 4 byte boundary.
+	 * To align with the C++ standard, the first elment of the array
+	 * contains the number of actual constructors. The last element is
+	 * NULL.
+	 */
+	. = ALIGN(4);
+	__CTOR_LIST__ = .;
+	LONG((__CTOR_END__ - __CTOR_LIST__) / 4 - 2)
+	KEEP(*(SORT_BY_NAME(".ctors*")))
+	LONG(0)
+	__CTOR_END__ = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+
+    SECTION_PROLOGUE(init_array, (OPTIONAL),)
+	{
+	. = ALIGN(4);
+	__init_array_start = .;
+	KEEP(*(SORT_BY_NAME(".init_array*")))
+	__init_array_end = .;
+	} GROUP_LINK_IN(ROMABLE_REGION)
+#endif
 
     SECTION_PROLOGUE(_RODATA_SECTION_NAME,,)
 	{
 	*(.rodata)
 	*(".rodata.*")
+	*(.gnu.linkonce.r.*)
 	} GROUP_LINK_IN(ROMABLE_REGION)
 
 	_image_rom_end = .;
@@ -170,6 +193,8 @@ SECTIONS
 	__data_ram_start = .;
 	*(.data)
 	*(".data.*")
+
+#if CONFIG_SW_ISR_TABLE_DYNAMIC
 	KEEP(*(.isr_irq*))
 
 	/* sections for IRQ0-9 */
@@ -180,21 +205,12 @@ SECTIONS
 
 	/* sections for IRQ100-999 */
 	KEEP(*(SORT(.gnu.linkonce.isr_irq[0-9][0-9][0-9])))
+#endif
 	} GROUP_LINK_IN(RAMABLE_REGION)
 
 	SECTION_PROLOGUE (initlevel, (OPTIONAL),)
 	{
-		__initconfig_start = .;
-		INIT_LEVEL(0)
-		INIT_LEVEL(1)
-		INIT_LEVEL(2)
-		INIT_LEVEL(3)
-		INIT_LEVEL(4)
-		INIT_LEVEL(5)
-		INIT_LEVEL(6)
-		INIT_LEVEL(7)
-		KEEP(*(SORT_BY_NAME(".initconfig*")))
-		__initconfig_end = .;
+		DEVICE_INIT_SECTIONS()
 	} GROUP_LINK_IN(RAMABLE_REGION)
 
 	SECTION_PROLOGUE (_k_task_list, (OPTIONAL),)
@@ -234,6 +250,14 @@ SECTIONS
 			*(._k_mem_map_ptr.private.*)
 		KEEP(*(SORT_BY_NAME("._k_mem_map_ptr*")))
 		_k_mem_map_ptr_end = .;
+	} GROUP_LINK_IN(RAMABLE_REGION)
+
+	SECTION_PROLOGUE(_k_event_list, (OPTIONAL),)
+	{
+		_k_event_list_start = .;
+			*(._k_event_list.event.*)
+		KEEP(*(SORT_BY_NAME("._k_event_list*")))
+		_k_event_list_end = .;
 	} GROUP_LINK_IN(RAMABLE_REGION)
 
     __data_ram_end = .;
@@ -299,6 +323,14 @@ SECTIONS
 	*(".scs.*")
 	 } GROUP_LINK_IN(SYSTEM_CONTROL_SPACE)
     GROUP_END(SYSTEM_CONTROL_SPACE)
+
+	/* verify we don't have rogue .init_<something> initlevel sections */
+	SECTION_PROLOGUE(initlevel_error, (OPTIONAL),)
+	{
+		DEVICE_INIT_UNDEFINED_SECTION()
+	}
+	ASSERT(SIZEOF(initlevel_error) == 0, "Undefined initialization levels used.")
+
     }
 
 #ifdef CONFIG_XIP

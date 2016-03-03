@@ -1,5 +1,3 @@
-/* scb.h - ARM CORTEX-M3 System Control Block interface */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,12 +14,14 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Most of the SCB interface consists of simple bit-flipping methods, and is
-implemented as inline functions in scb.h. This module thus contains only data
-definitions and more complex routines, if needed.
+/**
+ * @file
+ * @brief ARM CORTEX-M3 System Control Block interface
+ *
+ *
+ * Most of the SCB interface consists of simple bit-flipping methods, and is
+ * implemented as inline functions in scb.h. This module thus contains only data
+ * definitions and more complex routines, if needed.
  */
 
 #include <nanokernel.h>
@@ -29,6 +29,51 @@ definitions and more complex routines, if needed.
 #include <misc/util.h>
 
 #define SCB_AIRCR_VECTKEY_EN_W 0x05FA
+
+#if defined(CONFIG_SOC_TI_LM3S6965_QEMU)
+/*
+ * QEMU is missing the support for rebooting through the SYSRESETREQ mechanism.
+ * Just jump back to __reset() of the image in flash, which address can
+ * _always_ be found in the vector table reset slot located at address 0x4.
+ */
+
+static void software_reboot(void)
+{
+	extern void _do_software_reboot(void);
+	extern void _force_exit_one_nested_irq(void);
+	/*
+	 * force enable interrupts locked via PRIMASK if somehow disabled: the
+	 * boot code does not enable them
+	 */
+	__asm__ volatile("cpsie i" :::);
+
+	if (_ScbIsInThreadMode()) {
+		_do_software_reboot();
+	} else {
+		__asm__ volatile(
+			"ldr r0,  =_force_exit_one_nested_irq\n\t"
+			"bx r0\n\t"
+			:::);
+	}
+}
+#define DO_REBOOT() software_reboot()
+#else
+static void reboot_through_sysresetreq(void)
+{
+	union __aircr reg;
+
+	reg.val = __scs.scb.aircr.val;
+	reg.bit.vectkey = SCB_AIRCR_VECTKEY_EN_W;
+	reg.bit.sysresetreq = 1;
+	__scs.scb.aircr.val = reg.val;
+
+	/* the reboot is not immediate, so wait here until it takes effect */
+	for (;;) {
+		;
+	}
+}
+#define DO_REBOOT() reboot_through_sysresetreq()
+#endif
 
 /**
  *
@@ -41,23 +86,14 @@ definitions and more complex routines, if needed.
 
 void sys_arch_reboot(int type)
 {
-	union __aircr reg;
-
 	ARG_UNUSED(type);
-
-	reg.val = __scs.scb.aircr.val;
-	reg.bit.vectkey = SCB_AIRCR_VECTKEY_EN_W;
-	reg.bit.sysresetreq = 1;
-	__scs.scb.aircr.val = reg.val;
-
-	/* the reboot is not immediate, so wait here until it takes effect */
-	for(;;);
+	DO_REBOOT();
 }
 
 /**
  *
- * @brief Set the number of priority groups based on the number
- *                      of exception priorities desired
+ * @brief Set the number of priority groups based on the number of exception
+ * priorities desired
  *
  * Exception priorities can be divided in priority groups, inside which there is
  * no preemption. The priorities inside a group are only used to decide which
@@ -65,11 +101,11 @@ void sys_arch_reboot(int type)
  *
  * The number of priorities has to be a power of two, from 1 to 128.
  *
+ * @param n the number of priorities
+ *
  * @return N/A
  */
-
-void _ScbNumPriGroupSet(unsigned int n /* number of priorities */
-			)
+void _ScbNumPriGroupSet(unsigned int n)
 {
 	unsigned int set;
 	union __aircr reg;

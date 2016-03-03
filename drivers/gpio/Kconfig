@@ -7,7 +7,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#	 http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,13 +17,22 @@
 #
 
 menuconfig GPIO
-        bool
+		bool
 	prompt "GPIO Drivers"
-        default n
-        help
-          Include GPIO drivers in system config
+		default n
+		help
+		  Include GPIO drivers in system config
 
 if GPIO
+
+config GPIO_DEBUG
+	bool
+	prompt "Debug output for GPIO drivers"
+	default n
+	depends on GPIO
+	help
+	  Enable the debug output for GPIO drivers
+
 config GPIO_DW
 	prompt "Designware GPIO"
 	default n
@@ -31,6 +40,27 @@ config GPIO_DW
 	bool
 	help
 	  Enable driver for Designware GPIO
+
+config GPIO_DW_IO_ACCESS
+	prompt "I/O register access"
+	default y if ARC
+	default n
+	bool
+	help
+	  Driver access configuration register by
+	  I/O or auxiliary registers.
+
+config GPIO_DW_BOTHEDGES_SUPPORT
+	bool
+	prompt "Interrupt on Both Edges"
+	default y
+	depends on GPIO_DW && !ARC
+	help
+	This option is enabled by platforms that
+	supports the interrupt-both-edges feature.
+	This feature allows the GPIO hardware to
+	trigger and interrupt on both, falling and
+	rising, edges of an input.
 
 config GPIO_DW_SHARED_IRQ
 	bool
@@ -52,22 +82,40 @@ config	GPIO_DW_CLASS
 	depends on GPIO_DW && PCI
 	default 0x0C
 
+config GPIO_DW_INIT_PRIORITY
+	int
+	default 60
+	prompt "Init priority"
+	help
+	  Device driver initialization priority.
+
+config GPIO_DW_CLOCK_GATE
+	bool "Enable glock gating"
+	depends on GPIO_DW
+	select CLOCK_CONTROL
+	default n
+
+config GPIO_DW_CLOCK_GATE_DRV_NAME
+	string
+	depends on GPIO_DW_CLOCK_GATE
+	default ""
+
 config GPIO_DW_0
-       bool "Designware GPIO block 0"
-       depends on GPIO_DW
-       default n
-       help
-       Include Designware GPIO driver
+	   bool "Designware GPIO block 0"
+	   depends on GPIO_DW
+	   default n
+	   help
+	   Include Designware GPIO driver
 
 config GPIO_DW_0_NAME
-       string "Driver name"
-       depends on GPIO_DW_0
-       default "GPIO_0"
+	   string "Driver name"
+	   depends on GPIO_DW_0
+	   default "GPIO_0"
 
 config GPIO_DW_0_BASE_ADDR
-       hex "Controller base address"
-       depends on GPIO_DW_0
-       default 0x00000000
+	   hex "Controller base address"
+	   depends on GPIO_DW_0
+	   default 0x00000000
 
 config	GPIO_DW_0_BUS
 	int "Port 0 PCI Bus"
@@ -90,11 +138,16 @@ config  GPIO_DW_0_BAR
 	default 0
 
 config GPIO_DW_0_BITS
-       int "number of pins controlled"
-       depends on GPIO_DW_0
-       default 32
-       help
-       Number of pins controlled by controller
+	   int "number of pins controlled"
+	   depends on GPIO_DW_0
+	   default 32
+	   help
+	   Number of pins controlled by controller
+
+config GPIO_DW_0_CLOCK_GATE_SUBSYS
+	int "Clock controller's subsystem"
+	depends on GPIO_DW_CLOCK_GATE && GPIO_DW_0
+	default 0
 
 choice
 	prompt "Port 0 Interrupts via"
@@ -116,6 +169,33 @@ config GPIO_DW_0_IRQ_SHARED
 
 endchoice
 
+choice
+prompt "DW GPIO port 0 trigger condition"
+default GPIO_DW_0_RISING_EDGE
+depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
+
+config GPIO_DW_0_FALLING_EDGE
+	bool "Falling edge"
+	help
+	  DW GPIO port 0 uses falling edge interrupt
+
+config GPIO_DW_0_RISING_EDGE
+	bool "Rising edge"
+	help
+	  DW GPIO port 0 uses rising edge interrupt
+
+config GPIO_DW_0_LEVEL_HIGH
+	bool "Level high"
+	help
+	  DW GPIO port 0 uses level high interrupt
+
+config GPIO_DW_0_LEVEL_LOW
+	bool "Level low"
+	help
+	  DW GPIO port 0 uses level low interrupt
+
+endchoice
+
 config GPIO_DW_0_IRQ_SHARED_NAME
 	string "Device name for Shared IRQ"
 	depends on GPIO_DW_0 && GPIO_DW_0_IRQ_SHARED
@@ -125,42 +205,47 @@ config GPIO_DW_0_IRQ_SHARED_NAME
 	  correctly.
 
 config GPIO_DW_0_IRQ
-       int "Controller interrupt number"
-       depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
-       default 0
-       help
-       IRQ number for the controller
+	   int "Controller interrupt number"
+	   depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
+	   default 0
+	   help
+	   IRQ number for the controller
 
 config GPIO_DW_0_PRI
-       int "Controller interrupt priority"
-       depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
-       default 2
-       help
-       IRQ priority
+	   int "Controller interrupt priority"
+	   depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
+	   default 2
+	   help
+	   IRQ priority
 
 config GPIO_DW_1
-       bool "Designware GPIO block 1"
-       depends on GPIO_DW
-       default n
-       help
-       Include Designware GPIO driver
+	   bool "Designware GPIO block 1"
+	   depends on GPIO_DW
+	   default n
+	   help
+	   Include Designware GPIO driver
 
 config GPIO_DW_1_NAME
-       string "Driver name"
-       depends on GPIO_DW_1
-       default "GPIO_1"
+	   string "Driver name"
+	   depends on GPIO_DW_1
+	   default "GPIO_1"
 
 config GPIO_DW_1_BASE_ADDR
-       hex "Controller base address"
-       depends on GPIO_DW_1
-       default 0x00000000
+	   hex "Controller base address"
+	   depends on GPIO_DW_1
+	   default 0x00000000
 
 config GPIO_DW_1_BITS
-       int "number of pins controlled"
-       depends on GPIO_DW_1
-       default 32
-       help
-       Number of pins controlled by controller
+	   int "number of pins controlled"
+	   depends on GPIO_DW_1
+	   default 32
+	   help
+	   Number of pins controlled by controller
+
+config GPIO_DW_1_CLOCK_GATE_SUBSYS
+	int "Clock controller's subsystem"
+	depends on GPIO_DW_CLOCK_GATE && GPIO_DW_1
+	default 0
 
 choice
 	prompt "Port 1 Interrupts via"
@@ -191,43 +276,43 @@ config GPIO_DW_1_IRQ_SHARED_NAME
 	  correctly.
 
 config GPIO_DW_1_IRQ
-       int "Controller interrupt number"
-       depends on GPIO_DW_1 && GPIO_DW_1_IRQ_DIRECT
-       default 0
-       help
-       IRQ number for the controller
+	   int "Controller interrupt number"
+	   depends on GPIO_DW_1 && GPIO_DW_1_IRQ_DIRECT
+	   default 0
+	   help
+	   IRQ number for the controller
 
 config GPIO_DW_1_PRI
-       int "Controller interrupt priority"
-       depends on GPIO_DW_1 && GPIO_DW_1_IRQ_DIRECT
-       default 2
-       help
-       IRQ priority
+	   int "Controller interrupt priority"
+	   depends on GPIO_DW_1 && GPIO_DW_1_IRQ_DIRECT
+	   default 2
+	   help
+	   IRQ priority
 
 choice
-prompt "DW GPIO port 0 trigger condition"
-default GPIO_DW_0_RISING_EDGE
-depends on GPIO_DW_0 && GPIO_DW_0_IRQ_DIRECT
+prompt "DW GPIO port 1 trigger condition"
+default GPIO_DW_1_RISING_EDGE
+depends on GPIO_DW_1 && GPIO_DW_1_IRQ_DIRECT
 
-config GPIO_DW_0_FALLING_EDGE
+config GPIO_DW_1_FALLING_EDGE
 	bool "Falling edge"
 	help
-	  DW GPIO port 0 uses falling edge interrupt
+	  DW GPIO port 1 uses falling edge interrupt
 
-config GPIO_DW_0_RISING_EDGE
+config GPIO_DW_1_RISING_EDGE
 	bool "Rising edge"
 	help
-	  DW GPIO port 0 uses rising edge interrupt
+	  DW GPIO port 1 uses rising edge interrupt
 
-config GPIO_DW_0_LEVEL_HIGH
+config GPIO_DW_1_LEVEL_HIGH
 	bool "Level high"
 	help
-	  DW GPIO port 0 uses level high interrupt
+	  DW GPIO port 1 uses level high interrupt
 
-config GPIO_DW_0_LEVEL_LOW
+config GPIO_DW_1_LEVEL_LOW
 	bool "Level low"
 	help
-	  DW GPIO port 0 uses level low interrupt
+	  DW GPIO port 1 uses level low interrupt
 
 endchoice
 
@@ -246,6 +331,13 @@ config GPIO_PCAL9535A_DEBUG
 	default n
 	help
 	  Enable debugging for PCAL9535A driver.
+
+config GPIO_PCAL9535A_INIT_PRIORITY
+	int
+	default 70
+	prompt "Init priority"
+	help
+	  Device driver initialization priority.
 
 config GPIO_PCAL9535A_0
 	bool "PCAL9535A GPIO chip #0"
@@ -370,6 +462,14 @@ config GPIO_MMIO
 	default n
 	help
 	  Enable driver for MMIO-based GPIOs.
+
+config GPIO_MMIO_INIT_PRIORITY
+	int
+	depends on GPIO_MMIO
+	default 60
+	prompt "Init priority"
+	help
+	  Device driver initialization priority.
 
 config GPIO_MMIO_0
 	bool "MMIO-based GPIO Port #0"
@@ -498,5 +598,313 @@ config GPIO_MMIO_1_OUTPUT
 	default 0x0
 	help
 	  The memory address for output pin level register.
+
+config GPIO_QMSI
+	bool "QMSI GPIO driver"
+	depends on GPIO && QMSI_DRIVERS
+	default n
+	help
+	  Enable the GPIO driver found on Intel Microcontroller
+	  platforms, using the QMSI library.
+
+config GPIO_QMSI_0
+	bool "QMSI GPIO block 0"
+	depends on GPIO_QMSI
+	default n
+	help
+	  Include support for the GPIO port 0 using QMSI.
+
+config GPIO_QMSI_0_NAME
+	string "Driver name"
+	depends on GPIO_QMSI_0
+	default "GPIO_0"
+
+config GPIO_QMSI_0_IRQ
+	int "Controller interrupt number"
+	depends on GPIO_QMSI_0
+	default 0
+	help
+	  IRQ number for the controller
+
+config GPIO_QMSI_0_PRI
+	int "Controller interrupt priority"
+	depends on GPIO_QMSI_0
+	default 2
+	help
+	  IRQ priority
+
+config GPIO_SCH
+	bool "SCH GPIO controller"
+	depends on GPIO
+	default n
+	help
+	  Enable the SCH GPIO driver found on Intel platforms
+
+config GPIO_SCH_INIT_PRIORITY
+	int
+	depends on GPIO_SCH
+	default 60
+	prompt "Init priority"
+	help
+	  Device driver initialization priority.
+
+config GPIO_SCH_LEGACY_IO_PORTS_ACCESS
+	bool "SCH registers accessed through legacy I/O ports"
+	depends on GPIO_SCH
+	default n
+	help
+	  Enable the legacy I/O ports access methods for SCH registers.
+
+config GPIO_SCH_0
+	bool "Enable SCH GPIO port 0"
+	default 0
+	depends on GPIO_SCH
+
+config GPIO_SCH_0_DEV_NAME
+	string "Name of the device"
+	depends on GPIO_SCH_0
+	default "gpio_sch_0"
+
+config GPIO_SCH_0_BASE_ADDR
+	hex "SCH GPIO base address"
+	depends on GPIO_SCH_0
+	default 0x0
+	help
+	  The memory address where the memory mapped registers are found
+
+config GPIO_SCH_0_BITS
+	int "Total of GPIO pins controlled"
+	depends on GPIO_SCH_0
+	default 0
+	help
+	  The total of pins the controller can manage (CPU dependent)
+
+config GPIO_SCH_1
+	bool "Enable SCH GPIO port 1"
+	default n
+	depends on GPIO_SCH
+
+config GPIO_SCH_1_DEV_NAME
+	string "Name of the device"
+	depends on GPIO_SCH_1
+	default "gpio_sch_1"
+
+config GPIO_SCH_1_BASE_ADDR
+	hex "SCH GPIO base address"
+	depends on GPIO_SCH_1
+	default 0x0
+	help
+	  The memory address where the memory mapped registers are found
+
+config GPIO_SCH_1_BITS
+	int "Total of GPIO pins controlled"
+	depends on GPIO_SCH_1
+	default 0
+	help
+	  The total of pins the controller can manage (CPU dependent)
+
+config GPIO_K64
+	bool "Freescale K64-based GPIO driver"
+	depends on GPIO
+	default n
+	help
+	  Enable driver for Freescale K64-based GPIOs.
+
+config PORT_K64_INT_STATUS_OFFSET
+	hex "Freescale K64-based Port Control interrupt status register offset"
+	depends on GPIO_K64
+	default 0xA0
+
+config GPIO_K64_A
+	bool "Freescale K64-based GPIO Port A"
+	depends on GPIO_K64
+	default n
+	help
+	  Enable config options for Freescale K64-based GPIO port A.
+
+config GPIO_K64_A_DEV_NAME
+	string "Freescale K64-based GPIO Port A Device Name"
+	depends on GPIO_K64_A
+	default "GPIO_K64_A"
+	help
+	  Specify the device name.
+
+config GPIO_K64_A_BASE_ADDR
+	hex "Freescale K64-based GPIO Port A base address"
+	depends on GPIO_K64_A
+	default 0x400FF000
+
+config PORT_K64_A_BASE_ADDR
+	hex "Freescale K64-based Port Control Port A base address"
+	depends on GPIO_K64_A
+	default 0x40049000
+
+config GPIO_K64_PORTA_IRQ
+	int "Freescale K64-based Port A interrupt number"
+	depends on GPIO_K64_A
+	default 59
+	help
+	  K64 Port A IRQ number for the interrupt controller
+
+config GPIO_K64_PORTA_PRI
+	int "Freescale K64-based Port A interrupt priority"
+	depends on GPIO_K64_A
+	default 2
+	help
+	  K64 Port A IRQ priority
+
+config GPIO_K64_B
+	bool "Freescale K64-based GPIO Port B"
+	depends on GPIO_K64
+	default n
+	help
+	  Enable config options for Freescale K64-based GPIO port A.
+
+config GPIO_K64_B_DEV_NAME
+	string "Freescale K64-based GPIO Port B Device Name"
+	depends on GPIO_K64_B
+	default "GPIO_K64_B"
+	help
+	  Specify the device name.
+
+config GPIO_K64_B_BASE_ADDR
+	hex "Freescale K64-based GPIO Port B base address"
+	depends on GPIO_K64_B
+	default 0x400FF040
+
+config PORT_K64_B_BASE_ADDR
+	hex "Freescale K64-based Port Control Port B base address"
+	depends on GPIO_K64_B
+	default 0x4004A000
+
+config GPIO_K64_PORTB_IRQ
+	int "Freescale K64-based Port B interrupt number"
+	depends on GPIO_K64_B
+	default 60
+	help
+	K64 Port B IRQ number for the interrupt controller
+
+config GPIO_K64_PORTB_PRI
+	int "Freescale K64-based Port B interrupt priority"
+	depends on GPIO_K64_B
+	default 2
+	help
+	  K64 Port B IRQ priority
+
+config GPIO_K64_C
+	bool "Freescale K64-based GPIO Port B"
+	depends on GPIO_K64
+	default n
+	help
+	  Enable config options for Freescale K64-based GPIO port A.
+
+config GPIO_K64_C_DEV_NAME
+	string "Freescale K64-based GPIO Port B Device Name"
+	depends on GPIO_K64_C
+	default "GPIO_K64_C"
+	help
+	  Specify the device name.
+
+config GPIO_K64_C_BASE_ADDR
+	hex "Freescale K64-based GPIO Port C base address"
+	depends on GPIO_K64_C
+	default 0x400FF080
+
+config PORT_K64_C_BASE_ADDR
+	hex "Freescale K64-based Port Control Port C base address"
+	depends on GPIO_K64_C
+	default 0x4004B000
+
+config GPIO_K64_PORTC_IRQ
+	int "Freescale K64-based Port C interrupt number"
+	depends on GPIO_K64_C
+	default 61
+	help
+	  K64 Port C IRQ number for the interrupt controller
+
+config GPIO_K64_PORTC_PRI
+	int "Freescale K64-based Port C interrupt priority"
+	depends on GPIO_K64_C
+	default 2
+	help
+	  K64 Port C IRQ priority
+
+config GPIO_K64_D
+	bool "Freescale K64-based GPIO Port D"
+	depends on GPIO_K64
+	default n
+	help
+	  Enable config options for Freescale K64-based GPIO port A.
+
+config GPIO_K64_D_DEV_NAME
+	string "Freescale K64-based GPIO Port D Device Name"
+	depends on GPIO_K64_D
+	default "GPIO_K64_D"
+	help
+	  Specify the device name.
+
+config GPIO_K64_D_BASE_ADDR
+	hex "Freescale K64-based GPIO Port D base address"
+	depends on GPIO_K64_D
+	default 0x400FF0C0
+
+config PORT_K64_D_BASE_ADDR
+	hex "Freescale K64-based Port Control Port D base address"
+	depends on GPIO_K64_D
+	default 0x4004C000
+
+config GPIO_K64_PORTD_IRQ
+	int "Freescale K64-based Port D interrupt number"
+	depends on GPIO_K64_D
+	default 62
+	help
+	K64 Port D IRQ number for the interrupt controller
+
+config GPIO_K64_PORTD_PRI
+	int "Freescale K64-based Port D interrupt priority"
+	depends on GPIO_K64_D
+	default 2
+	help
+	  K64 Port D IRQ priority
+
+config GPIO_K64_E
+	bool "Freescale K64-based GPIO Port E"
+	depends on GPIO_K64
+	default n
+	help
+	  Enable config options for Freescale K64-based GPIO port A.
+
+config GPIO_K64_E_DEV_NAME
+	string "Freescale K64-based GPIO Port E Device Name"
+	depends on GPIO_K64_E
+	default "GPIO_K64_E"
+	help
+	  Specify the device name.
+
+config GPIO_K64_E_BASE_ADDR
+	hex "Freescale K64-based GPIO Port E base address"
+	depends on GPIO_K64_E
+	default 0x400FF100
+
+config PORT_K64_E_BASE_ADDR
+	hex "Freescale K64-based Port Control Port E base address"
+	depends on GPIO_K64_E
+	default 0x4004D000
+
+config GPIO_K64_PORTE_IRQ
+	int "Freescale K64-based Port E interrupt number"
+	depends on GPIO_K64_E
+	default 63
+	help
+	K64 Port E IRQ number for the interrupt controller
+
+config GPIO_K64_PORTE_PRI
+	int "Freescale K64-based Port E interrupt priority"
+	depends on GPIO_K64_E
+	default 2
+	help
+	  K64 Port E IRQ priority
+
+source "drivers/gpio/Kconfig.atmel_sam3"
 
 endif # GPIO

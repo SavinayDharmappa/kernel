@@ -1,5 +1,3 @@
-/* vector_table.h - definitions for the boot vector table */
-
 /*
  * Copyright (c) 2013-2015 Wind River Systems, Inc.
  *
@@ -16,20 +14,26 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Definitions for the boot vector table.
-
-System exception handler names all have the same format:
-
-  __<exception name with underscores>
-
-No other symbol has the same format, so they are easy to spot.
+/**
+ * @file
+ * @brief Definitions for the boot vector table
+ *
+ *
+ * Definitions for the boot vector table.
+ *
+ * System exception handler names all have the same format:
+ *
+ *   __<exception name with underscores>
+ *
+ * No other symbol has the same format, so they are easy to spot.
  */
 
 #ifndef _VECTOR_TABLE__H_
 #define _VECTOR_TABLE__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 
@@ -64,5 +68,9 @@ GTEXT(_isr_wrapper)
 extern void *_vector_table[];
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _VECTOR_TABLE__H_ */

@@ -1,5 +1,3 @@
-/* memory_map-m3-m4.h - ARM CORTEX-M3/M4 memory map */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module contains definitions for the memory map parts specific to the
-CORTEX-M3/M4 series of processors. It is included by nanokernel/ARM/memory_map.h
-
+/**
+ * @file
+ * @brief ARM CORTEX-M3/M4 memory map
+ *
+ * This module contains definitions for the memory map parts specific to the
+ * CORTEX-M3/M4 series of processors. It is included by
+ * nanokernel/ARM/memory_map.h
  */
 
 #ifndef _MEMORY_MAP_M3_M4__H_

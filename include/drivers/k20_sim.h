@@ -29,6 +29,10 @@
 #include <stdint.h>
 #include <misc/__assert.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define SIM_OCS32K_SYS 0
 #define SIM_OCS32K_RTS 2
 #define SIM_OCS32K_LPO 3 /* 1kHz */
@@ -118,11 +122,13 @@ typedef union {
 		uint32_t uart0_rx_src : 2 __packed;
 		uint32_t uart1_tx_src : 2 __packed;
 		uint32_t uart1_rx_src : 2 __packed;
-		uint32_t res_8_31 : 24 __packed;
+		uint32_t res_8_9 : 2 __packed;
+		uint32_t uart4_clk_en : 1 __packed;
+		uint32_t uart5_clk_en : 1 __packed;
+		uint32_t res_12_31: 20 __packed;
 	} field;
 } SIM_SCGC1_t; /* 0x1028*/
 
-#define SIM_UART_CLK_ENABLE(uart) (uint32_t)(1 << (10 + uart))
 typedef union {
 	uint32_t value;
 	struct {
@@ -190,7 +196,7 @@ typedef union {
 
 /* K20 Microntroller SIM module register structure */
 
-typedef volatile struct {
+struct K20_SIM {
 	SIM_SOPT1_t sopt1;		       /* 0x0000 */
 	SIM_SOPT1CFG_t sopt1_cfg;	       /* 0x0004 */
 	uint8_t res0008_1003[0x1003 - 0x8];    /* 0x0008-0x1003 Reserved */
@@ -211,12 +217,10 @@ typedef volatile struct {
 	SIM_CLKDIV1_t clkdiv1;		       /* 0x1044 */
 	uint32_t clkdiv2;		       /* 0x1048 */
 	uint8_t res104c_1063[0x1063 - 0x104c]; /* Reserved */
-} K20_SIM_t;
+};
 
-static ALWAYS_INLINE void _k20_sim_uart_clk_enable(K20_SIM_t *sim,
-						   uint8_t port)
-{
-	sim->scgc4.value |= SIM_UART_CLK_ENABLE(port);
+#ifdef __cplusplus
 }
+#endif
 
 #endif /* _K20SIM_H_ */

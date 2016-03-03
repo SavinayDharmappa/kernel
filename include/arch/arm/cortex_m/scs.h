@@ -1,5 +1,3 @@
-/* scs.h - ARM CORTEX-M System Control Space */
-
 /*
  * Copyright (c) 2013-2015 Wind River Systems, Inc.
  *
@@ -16,46 +14,52 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Define the System Control Space for the CORTEX-M series of processors and
-provide an interface for miscellaneous SCS functionalities.
-
-All register and bit-field names come from the
-
-  Cortex-M3 Devices
-  Generic User Guide
-  ARM DUI 0552A (ID121610)
-
-and
-
-  Cortex-M3
-  Revision r2p1
-  Technical Reference Manual
-  ARM DDI 0337I (ID072410)
-
-documents from ARM.
-
-The API does not account for all possible usages of the SCS, only the
-functionalities needed by the kernel. It does not contain NVIC and
-SCB functionalities either: these can be found in nvic.h and scb.h.
-
-MPU functionalities are not implemented.
-
-The same effect can be achieved by directly writing in the registers of the
-SCS, using the __scs data structure (or hardcoded values), but the APIs found
-here are less error-prone, especially for registers with multiple instances to
-account for 16 exceptions.
-
-If access to a missing functionality is needed, directly writing to the
-registers is the way to implement it.
-
-Note that the 'stir' register, even if not in the 'nvic' part of the SCB, is
-still considered part of the NVIC and an API for it is provided in nvic.h.
+/**
+ * @file
+ * @brief ARM CORTEX-M System Control Space
+ *
+ * Define the System Control Space for the CORTEX-M series of processors and
+ * provide an interface for miscellaneous SCS functionalities.
+ *
+ * All register and bit-field names come from the
+ *
+ *   Cortex-M3 Devices
+ *   Generic User Guide
+ *   ARM DUI 0552A (ID121610)
+ *
+ * and
+ *
+ *   Cortex-M3
+ *   Revision r2p1
+ *   Technical Reference Manual
+ *   ARM DDI 0337I (ID072410)
+ *
+ * documents from ARM.
+ *
+ * The API does not account for all possible usages of the SCS, only the
+ * functionalities needed by the kernel. It does not contain NVIC and
+ * SCB functionalities either: these can be found in nvic.h and scb.h.
+ *
+ * MPU functionalities are not implemented.
+ *
+ * The same effect can be achieved by directly writing in the registers of the
+ * SCS, using the __scs data structure (or hardcoded values), but the APIs found
+ * here are less error-prone, especially for registers with multiple instances
+ * to account for 16 exceptions.
+ *
+ * If access to a missing functionality is needed, directly writing to the
+ * registers is the way to implement it.
+ *
+ * Note that the 'stir' register, even if not in the 'nvic' part of the SCB, is
+ * still considered part of the NVIC and an API for it is provided in nvic.h.
  */
 
 #ifndef _SCS__H_
 #define _SCS__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 
@@ -370,12 +374,13 @@ struct __scs {
 		union __scr scr;  /* 0xd10 System Control Register */
 		union __ccr ccr;  /* 0xd14 Configuration and Control Register */
 		uint8_t shpr[12]; /* 0xd18 System Handler Priority Registers
-					   Use ('exception number' - 4) to
-					   get index into array */
+				   *   Use ('exception number' - 4) to
+				   *   get index into array
+				   */
 		union __shcsr
 			shcsr;     /* 0xd24 Sys Handler Control and State Reg */
 		union __cfsr cfsr; /* 0xd28 Configurable Fault Status Register
-				      */
+				    */
 		union __hfsr hfsr; /* 0xd2C Hard Fault Status Register */
 		uint32_t dfsr;     /* 0xd30 Debug Fault Status Register */
 		uint32_t mmfar;    /* 0xd34 MemManage Fault Address Register */
@@ -383,7 +388,8 @@ struct __scs {
 		uint32_t afsr;     /* 0xd3C Aux Fault Status Register */
 	} scb;			   /* offset: 0xd00, size 0x040 */
 
-	/* d40 -> d7f: processor feature ID registers (pp.778-779 in DDI0403D)
+	/*
+	 * d40 -> d7f: processor feature ID registers (pp.778-779 in DDI0403D)
 	 */
 	uint32_t rsvd__d40_d8f[(0xd90 - 0xd40) / 4];
 
@@ -394,7 +400,8 @@ struct __scs {
 		union __mpu_rnr mpu_rnr;   /* 0xd98 RW Region Number Register */
 		union __mpu_rbar mpu_rbar; /* 0xd9c RW Region Base Addr Reg. */
 		union __mpu_rasr mpu_rasr; /* 0xda0 RW Region Attr and Size
-					      Reg.*/
+					    * Reg.
+					    */
 		union __mpu_rbar mpu_rbar_a1; /* 0xda4 RW alias of mpu_rbar */
 		union __mpu_rasr mpu_rasr_a1; /* 0xda8 RW alias of mpu_rasr */
 		union __mpu_rbar mpu_rbar_a2; /* 0xdac RW alias of mpu_rbar */
@@ -405,9 +412,8 @@ struct __scs {
 
 	uint32_t rsvd__da4_eff[(0xf00 - 0xdbc) / 4];
 
-	uint32_t
-		stir; /* 0xf00 WO SW Trigger IRQ Reg. (bit 0-8/IRQ 0-239 only)
-			 */
+	/* 0xf00 WO SW Trigger IRQ Reg. (bit 0-8/IRQ 0-239 only) */
+	uint32_t stir;
 
 	uint32_t rsvd__f04_fff[(0x1000 - 0xF04) / 4];
 };
@@ -436,8 +442,8 @@ static inline int _ScsNumIrqGet(void)
  * From the ARM manuals:
  *
  * LDM/STM instructions increase the interrupt latency of the processor because
- * they must complete before the processor can stack the current state and invoke
- * the interrupt handler.
+ * they must complete before the processor can stack the current state and
+ * invoke the interrupt handler.
  *
  * @return N/A
  */
@@ -469,7 +475,8 @@ static inline void _ScsIntMultiCycleInstEnable(void)
  *
  * Disables write buffer use during default memory map accesses. This causes all
  * BusFaults to be precise BusFaults but decreases performance because any store
- * to memory must complete before the processor can execute the next instruction.
+ * to memory must complete before the processor can execute the next
+ * instruction.
  *
  * @return N/A
  */
@@ -535,7 +542,7 @@ static inline void _ScsFoldItEnable(void)
  *
  * It must be aligned on a 128-byte boundary.
  *
- * This routine should be called with interrupts locked and all sources of
+ * This routine must be called with interrupts locked and all sources of
  * interrupts disabled.
  *
  * @param new_addr The new address of the vector table.
@@ -546,8 +553,16 @@ static inline void _ScsFoldItEnable(void)
 static inline void _scs_relocate_vector_table(void *new_addr)
 {
 	__scs.scb.vtor.val = ((uint32_t)new_addr & 0xffffff80);
+	__asm__ volatile(
+		"dsb\n\t"
+		"isb\n\t"
+		:::);
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SCS__H_ */

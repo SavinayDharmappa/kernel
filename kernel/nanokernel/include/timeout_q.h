@@ -1,7 +1,7 @@
 /** @file
- @brief timeout queue for fibers on nanokernel objects
-
- This file is meant to be included by nanokernel/include/wait_q.h only
+ * @brief timeout queue for fibers on nanokernel objects
+ *
+ * This file is meant to be included by nanokernel/include/wait_q.h only
  */
 
 /*
@@ -24,6 +24,10 @@
 #define _kernel_nanokernel_include_timeout_q__h_
 
 #include <misc/dlist.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* initialize the nano timeouts part of TCS when enabled in the kernel */
 
@@ -62,7 +66,7 @@ static inline struct _nano_timeout *_nano_timeout_handle_one_timeout(
 		_nano_timeout_remove_tcs_from_wait_q(tcs);
 		fiberRtnValueSet(tcs, (unsigned int)0);
 	}
-	_nano_fiber_schedule(tcs);
+	_nano_fiber_ready(tcs);
 	t->delta_ticks_from_prev = -1;
 
 	return (struct _nano_timeout *)sys_dlist_peek_head(timeout_q);
@@ -92,7 +96,8 @@ static inline void _nano_timeout_abort(struct tcs *tcs)
 
 	if (!sys_dlist_is_tail(timeout_q, &t->node)) {
 		struct _nano_timeout *next =
-			(struct _nano_timeout *)sys_dlist_peek_next(timeout_q, &t->node);
+			(struct _nano_timeout *)sys_dlist_peek_next(timeout_q,
+								    &t->node);
 		next->delta_ticks_from_prev += t->delta_ticks_from_prev;
 	}
 	sys_dlist_remove(&t->node);
@@ -127,8 +132,8 @@ static int _nano_timeout_insert_point_test(sys_dnode_t *test, void *timeout)
 
 /* put a fiber on the timeout queue and record its wait queue */
 static inline void _nano_timeout_add(struct tcs *tcs,
-										struct _nano_queue *wait_q,
-										int32_t timeout)
+				     struct _nano_queue *wait_q,
+				     int32_t timeout)
 {
 	sys_dlist_t *timeout_q = &_nanokernel.timeout_q;
 	struct _nano_timeout *t = &tcs->nano_timeout;
@@ -146,7 +151,13 @@ static inline uint32_t _nano_get_earliest_timeouts_deadline(void)
 	sys_dlist_t *q = &_nanokernel.timeout_q;
 	struct _nano_timeout *t = (struct _nano_timeout *)sys_dlist_peek_head(q);
 
-	return t ? t->delta_ticks_from_prev : TICKS_UNLIMITED;
+	return t ? min((uint32_t)t->delta_ticks_from_prev,
+					(uint32_t)_nanokernel.task_timeout)
+			 : (uint32_t)_nanokernel.task_timeout;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _kernel_nanokernel_include_timeout_q__h_ */

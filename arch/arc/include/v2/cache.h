@@ -1,5 +1,3 @@
-/* cache.h - cache helper functions (ARC) */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,8 +14,10 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief Cache helper functions (ARC)
+ *
  * This file contains private nanokernel structures definitions and various
  * other definitions for the ARCv2 processor architecture.
  */
@@ -26,6 +26,10 @@
 #define _ARCV2_CACHE__H_
 
 #include <arch/cpu.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _ASMLANGUAGE
 
@@ -49,4 +53,9 @@ static ALWAYS_INLINE void _icache_setup(void)
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ARCV2_CACHE__H_ */

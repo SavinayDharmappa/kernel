@@ -1,5 +1,3 @@
-/* arcv2_irq_unit.c - ARCv2 Interrupt Unit device driver */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,8 +14,10 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief ARCv2 Interrupt Unit device driver
+ *
  * The ARCv2 interrupt unit has 16 allocated exceptions associated with
  * vectors 0 to 15 and 240 interrupts associated with vectors 16 to 255.
  * The interrupt unit is optional in the ARCv2-based processors. When
@@ -28,7 +28,7 @@
 #include <nanokernel.h>
 #include <arch/cpu.h>
 #include <board.h>
-extern void * _VectorTable;
+extern void *_VectorTable;
 
 /*
  * @brief Initialize the interrupt unit device driver
@@ -53,7 +53,7 @@ void _arc_v2_irq_unit_init(void)
 		_arc_v2_aux_reg_write(_ARC_V2_IRQ_ENABLE, _ARC_V2_INT_DISABLE);
 		_arc_v2_aux_reg_write(_ARC_V2_IRQ_TRIGGER, _ARC_V2_INT_LEVEL);
 	}
-	_arc_v2_aux_reg_write (_ARC_V2_IRQ_VECT_BASE, &_VectorTable);
+	_arc_v2_aux_reg_write(_ARC_V2_IRQ_VECT_BASE, &_VectorTable);
 }
 
 /*

@@ -15,46 +15,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-config ARM
-	def_bool y
+
+
+menu "ARM architecture"
+	depends on ARM
+
+config ARCH
+	default "arm"
 
 config ARCH_DEFCONFIG
-        string
-        default "arch/arm/defconfig"
-
-source "kernel/Kconfig"
-
-source "misc/Kconfig"
+	string
+	default "arch/arm/defconfig"
 
 menu "General Platform Configuration"
 
 choice
-prompt "Platform Selection"
-default PLATFORM_FSL_FRDM_K64F
-
-config  PLATFORM_FSL_FRDM_K64F
-	bool "FSL FRDM K64F"
-	select CPU_CORTEX_M
-	select CPU_CORTEX_M4
-
-config  PLATFORM_TI_LM3S6965
-	bool "TI LM3S6965"
-	select CPU_CORTEX_M
-	select CPU_CORTEX_M3
-
+prompt "SoC Selection"
+default SOC_FSL_FRDM_K64F
+source "arch/arm/soc/*/Kconfig.soc"
 endchoice
 
 config IS_BOOTLOADER
-	bool "Zephyr acts as a bootloader"
+	bool "Act as a bootloader"
 	default n
+	depends on XIP
+	help
+	This option indicates that Zephyr will act as a bootloader to execute
+	a separate Zephyr image payload.
 
-config SHOW_TIMER_HANDLER_ADDR
-	bool "Display timer handler address in handler"
-	default n
-
-config ARM_DEBUG_ESF
-	bool "Add saving of callee-saved registers in ESF"
-	default n
+config BOOTLOADER_SRAM_SIZE
+	int "SRAM reserved for when Zephyr acts as a bootloader"
+	default 16
+	depends on !XIP || IS_BOOTLOADER
+	help
+	This option specifies the amount of SRAM (measure in kB) reserved for
+	when Zephyr is to act as a bootloader.
 
 config ISA_THUMB2
 	bool
@@ -89,14 +84,6 @@ source "arch/arm/core/Kconfig"
 
 endmenu
 
-if PLATFORM_TI_LM3S6965
-source "arch/arm/platforms/ti_lm3s6965/Kconfig"
-endif
+source "arch/arm/soc/*/Kconfig"
 
-if PLATFORM_FSL_FRDM_K64F
-source "arch/arm/platforms/fsl_frdm_k64f/Kconfig"
-endif
-
-source "drivers/Kconfig"
-
-source "net/Kconfig"
+endmenu

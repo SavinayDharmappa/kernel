@@ -1,5 +1,3 @@
-/* vector_table.c - populated exception vector table */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,21 +14,23 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Vector table with exceptions filled in. The reset vector is the system entry
-point, ie. the first instruction executed.
-
-The table is populated with all the system exception handlers. No exception
-should not be triggered until the kernel is ready to handle them.
-
-We are using a C file instead of an assembly file (like the ARM vector table)
-to work around an issue with the assembler where:
-
-  .word <function>
-
-statements would end up with the two half-words of the functions' addresses
-swapped.
+/**
+ * @file
+ * @brief Populated exception vector table
+ *
+ * Vector table with exceptions filled in. The reset vector is the system entry
+ * point, ie. the first instruction executed.
+ *
+ * The table is populated with all the system exception handlers. No exception
+ * should not be triggered until the kernel is ready to handle them.
+ *
+ * We are using a C file instead of an assembly file (like the ARM vector table)
+ * to work around an issue with the assembler where:
+ *
+ *   .word <function>
+ *
+ * statements would end up with the two half-words of the functions' addresses
+ * swapped.
  */
 
 #include <stdint.h>
@@ -52,6 +52,8 @@ struct vector_table {
 	uint32_t ev_div_zero;
 	uint32_t ev_dc_error;
 	uint32_t ev_maligned;
+	uint32_t unused_1;
+	uint32_t unused_2;
 };
 
 struct vector_table _VectorTable _GENERIC_SECTION(.exc_vector_table) = {
@@ -69,6 +71,8 @@ struct vector_table _VectorTable _GENERIC_SECTION(.exc_vector_table) = {
 	(uint32_t)__ev_div_zero,
 	(uint32_t)__ev_dc_error,
 	(uint32_t)__ev_maligned,
+	0,
+	0
 };
 
 extern struct vector_table __start _ALIAS_OF(_VectorTable);

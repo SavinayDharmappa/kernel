@@ -1,5 +1,3 @@
-/* nano_private.h - private nanokernel definitions (IA-32) */
-
 /*
  * Copyright (c) 2010-2014 Wind River Systems, Inc.
  *
@@ -16,18 +14,21 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This file contains private nanokernel structures definitions and various other
-definitions for the Intel Architecture 32 bit (IA-32) processor architecture.
-The header include/nanokernel.h contains the public nanokernel interface
-definitions, with include/arch/nanokernel/x86/arch.h supplying the
-IA-32 specific portions of the public nanokernel interface.
-
-This file is also included by assembly language files which must #define
-_ASMLANGUAGE before including this header file.  Note that nanokernel assembly
-source files obtains structure offset values via "absolute symbols" in the
-offsets.o module.
+/**
+ * @file
+ * @brief Private nanokernel definitions (IA-32)
+ *
+ * This file contains private nanokernel structures definitions and various
+ * other definitions for the Intel Architecture 32 bit (IA-32) processor
+ * architecture.
+ * The header include/nanokernel.h contains the public nanokernel interface
+ * definitions, with include/arch/nanokernel/x86/arch.h supplying the
+ * IA-32 specific portions of the public nanokernel interface.
+ *
+ * This file is also included by assembly language files which must #define
+ * _ASMLANGUAGE before including this header file.  Note that nanokernel
+ * assembly source files obtains structure offset values via "absolute symbols"
+ * in the offsets.o module.
  */
 
 #ifndef _NANO_PRIVATE_H
@@ -116,7 +117,7 @@ offsets.o module.
 #define IA32_P5_MC_TYPE_MSR 0x0001
 #define IA32_MONITOR_FILTER_SIZE_MSR 0x0006
 #define IA32_TIME_STAMP_COUNTER_MSR 0x0010
-#define IA32_IA32_PLATFORM_ID_MSR 0x0017
+#define IA32_IA32_SOC_ID_MSR 0x0017
 #define IA32_APIC_BASE_MSR 0x001b
 #define IA32_FEATURE_CONTROL_MSR 0x003a
 #define IA32_BIOS_SIGN_MSR 0x008b
@@ -148,7 +149,7 @@ offsets.o module.
 #define IA32_DEBUGCTL_MSR 0x01d9
 #define IA32_SMRR_PHYSBASE_MSR 0x01f2
 #define IA32_SMRR_PHYSMASK_MSR 0x01f3
-#define IA32_PLATFORM_DCA_CAP_MSR 0x01f8
+#define IA32_SOC_DCA_CAP_MSR 0x01f8
 #define IA32_CPU_DCA_CAP_MSR 0x01f9
 #define IA32_DCA_0_CAP_MSR 0x01fa
 #define IA32_MTRR_PHYSBASE0_MSR 0x0200
@@ -393,13 +394,6 @@ offsets.o module.
 #define EFLAGS_INITIAL 0x00000200
 #define EFLAGS_MASK 0x00003200
 
-/* The following opcodes are used to create interrupt and exception stubs */
-
-#define IA32_CALL_OPCODE 0xe8
-#define IA32_PUSH_OPCODE 0x68
-#define IA32_JMP_OPCODE 0xe9
-#define IA32_ADD_OPCODE 0xc483
-
 #ifndef _ASMLANGUAGE
 
 #include <misc/util.h>
@@ -427,7 +421,7 @@ typedef struct s_coopReg {
 
 	/*
 	 * The following registers are considered non-volatile, i.e.
-	 *callee-save,
+	 * callee-save,
 	 * but their values are pushed onto the stack rather than stored in the
 	 * TCS
 	 * structure:
@@ -444,7 +438,7 @@ typedef struct s_coopReg {
  * The following structure defines the set of 'volatile' integer registers.
  * These registers need not be preserved by a called C function.  Given that
  * they are not preserved across function calls, they must be save/restored
- * (along with the s_coop_reg) when a pre-emptive context switch occurs.
+ * (along with the s_coop_reg) when a preemptive context switch occurs.
  */
 
 typedef struct s_preempReg {
@@ -594,17 +588,18 @@ typedef struct s_coopFloatReg {
 
 /*
  * The following structure defines the set of 'volatile' x87 FPU/MMX/SSE
- * registers.  Thes registers need not be preserved by a called C function.
+ * registers.  These registers need not be preserved by a called C function.
  * Given that they are not preserved across function calls, they must be
- * save/restored (along with s_coopFloatReg) when a pre-emptive context
+ * save/restored (along with s_coopFloatReg) when a preemptive context
  * switch occurs.
  */
 
 typedef struct s_preempFloatReg {
 	union {
-		tFpRegSet fpRegs; /* threads with USE_FP utilize this format */
-		tFpRegSetEx fpRegsEx; /* threads with USE_SSE utilize this
-					 format */
+		/* threads with USE_FP utilize this format */
+		tFpRegSet fpRegs;
+		/* threads with USE_SSE utilize this format */
+		tFpRegSetEx fpRegsEx;
 	} floatRegsUnion;
 } tPreempFloatReg;
 
@@ -618,9 +613,8 @@ typedef struct s_preempFloatReg {
 struct tcs {
 	/*
 	 * Link to next thread in singly-linked thread list (such as
-	 * prioritized
-	 * list of runnable fibers, or list of fibers waiting on a nanokernel
-	 * FIFO).
+	 * prioritized list of runnable fibers, or list of fibers waiting on a
+	 * nanokernel FIFO).
 	 */
 
 	struct tcs *link;
@@ -656,8 +650,7 @@ struct tcs {
 	/*
 	 * Nested exception count to maintain setting of EXC_ACTIVE flag across
 	 * outermost exception.  EXC_ACTIVE is used by _Swap() lazy FP
-	 * save/restore
-	 * and by debug tools.
+	 * save/restore and by debug tools.
 	 */
 	unsigned excNestCount; /* nested exception count */
 #endif /* CONFIG_FP_SHARING || CONFIG_GDB_INFO */
@@ -670,22 +663,22 @@ struct tcs {
 	struct _nano_timeout nano_timeout;
 #endif
 
+#ifdef CONFIG_ERRNO
+	int errno_var;
+#endif
+
 	/*
 	 * The location of all floating point related structures/fields MUST be
 	 * located at the end of struct tcs.  This way only the
-	 *fibers/tasks
-	 * that actually utilize non-integer capabilities need to account for
-	 * the increased memory required for storing FP state when sizing
-	 *stacks.
+	 * fibers/tasks that actually utilize non-integer capabilities need to
+	 * account for the increased memory required for storing FP state when
+	 * sizing stacks.
 	 *
-	 * Given that stacks "grow down" on IA-32, and the TCS is
-	 *located
+	 * Given that stacks "grow down" on IA-32, and the TCS is located
 	 * at the start of a thread's "workspace" memory, the stacks of
-	 *fibers/tasks
-	 * that do not utilize floating point instruction can effectively
-	 *consume
-	 * the memory occupied by the 'tCoopFloatReg' and 'tPreempFloatReg'
-	 * structures without ill effect.
+	 * fibers/tasks that do not utilize floating point instruction can
+	 * effectively consume the memory occupied by the 'tCoopFloatReg' and
+	 * 'tPreempFloatReg' structures without ill effect.
 	 */
 
 	tCoopFloatReg coopFloatReg; /* non-volatile float register storage */
@@ -706,7 +699,7 @@ typedef struct s_NANO {
 #endif
 	unsigned nested;  /* nested interrupt count */
 	char *common_isp; /* interrupt stack pointer base */
-#ifdef CONFIG_DEBUG_INFO
+#if defined(CONFIG_DEBUG_INFO)
 	NANO_ISF *isf;    /* ptr to interrupt stack frame */
 #endif
 
@@ -719,17 +712,17 @@ typedef struct s_NANO {
 	/*
 	 * A 'current_sse' field does not exist in addition to the 'current_fp'
 	 * field since it's not possible to divide the IA-32 non-integer
-	 * registers
-	 * into 2 distinct blocks owned by differing threads.  In other words,
-	 * given that the 'fxnsave/fxrstor' instructions save/restore both the
-	 * X87 FPU and XMM registers, it's not possible for a thread to only
-	 * "own" the XMM registers.
+	 * registers into 2 distinct blocks owned by differing threads.  In
+	 * other words, given that the 'fxnsave/fxrstor' instructions
+	 * save/restore both the X87 FPU and XMM registers, it's not possible
+	 * for a thread to only "own" the XMM registers.
 	 */
 
 	struct tcs *current_fp; /* thread (fiber or task) that owns the FP regs */
 #endif			  /* CONFIG_FP_SHARING */
 #ifdef CONFIG_NANO_TIMEOUTS
 	sys_dlist_t timeout_q;
+	int32_t task_timeout;
 #endif
 } tNANO;
 
@@ -747,14 +740,6 @@ typedef struct s_NANO {
 
 extern tNANO _nanokernel;
 
-/*
- * _interrupt_vectors_allocated[] is generated by the 'gen_idt' tool. It is
- * initialized to identify which interrupts have been statically connected
- * and which interrupts are available to be dynamically connected at run time.
- * The variable itself is defined in the linker file.
- */
-
-extern unsigned int _interrupt_vectors_allocated[];
 
 /* inline function definitions */
 
@@ -767,39 +752,31 @@ extern unsigned int _interrupt_vectors_allocated[];
  * function calls.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void nanoArchInit(void)
 {
 	extern void *__isr___SpuriousIntHandler;
 	extern void *_dummy_spurious_interrupt;
-	extern void _ExcEnt(void);
 	extern void *_dummy_exception_vector_stub;
 	extern char _interrupt_stack[CONFIG_ISR_STACK_SIZE];
+	extern void _ExcEnt(void);
 
 	_nanokernel.nested = 0;
 
-#ifdef CONFIG_NO_ISRS
-	_nanokernel.common_isp = (char *)NULL;
-#else  /* notdef CONFIG_NO_ISRS */
 	_nanokernel.common_isp = (char *)STACK_ROUND_DOWN(
 		&_interrupt_stack[CONFIG_ISR_STACK_SIZE - 1]);
-#endif /* notdef CONFIG_NO_ISRS */
-
 	/*
 	 * Forces the inclusion of the spurious interrupt handlers. If a
-	 * reference
-	 * isn't made then intconnect.o is never pulled in by the linker.
+	 * reference isn't made then intconnect.o is never pulled in by the
+	 * linker.
 	 */
 
 	_dummy_spurious_interrupt = &__isr___SpuriousIntHandler;
 
 	/*
 	 * Forces the inclusion of the exception vector stub code. If a
-	 * reference
-	 * isn't made then excstubs.o is never pulled in by the linker.
+	 * reference isn't made then excstubs.o is never pulled in by the
+	 * linker.
 	 */
 
 	_dummy_exception_vector_stub = &_ExcEnt;
@@ -811,19 +788,16 @@ static inline void nanoArchInit(void)
  *
  * @brief Set the return value for the specified fiber (inline)
  *
- * The register used to store the return value from a function call invocation is
- * set to <value>.  It is assumed that the specified <fiber> is pending, and
+ * @param fiber pointer to fiber
+ * @param value value to set as return value
+ *
+ * The register used to store the return value from a function call invocation
+ * is set to <value>.  It is assumed that the specified <fiber> is pending, and
  * thus the fibers context is stored in its TCS.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
-static inline void fiberRtnValueSet(
-	struct tcs *fiber,       /* pointer to fiber */
-	unsigned int value /* value to set as return value */
-	)
+static inline void fiberRtnValueSet(struct tcs *fiber, unsigned int value)
 {
 	/* write into 'eax' slot created in _Swap() entry */
 
@@ -834,37 +808,12 @@ static inline void fiberRtnValueSet(
 
 #define _EXC_STUB_SIZE 0x14
 
-/*
- * Performance optimization
- *
- * Macro PERF_OPT is defined if project is compiled with option other than
- * size optimization ("-Os" for GCC, "-XO -Xsize-opt" for Diab). If the
- * last of the compiler options is the size optimization, PERF_OPT is not
- * defined and the project is optimized for size, hence the stub should be
- * aligned to 1 and not 16.
- */
-#ifdef PERF_OPT
-#define _EXC_STUB_ALIGN 16
-#else
-#define _EXC_STUB_ALIGN 1
-#endif
-
-typedef unsigned char __aligned(_EXC_STUB_ALIGN) NANO_EXC_STUB[_EXC_STUB_SIZE];
-
-/*
- * Macro to declare a dynamic exception stub. Using the macro places the stub
- * in the .intStubSection which is located in the image according to the kernel
- * configuration.
- */
-#define NANO_CPU_EXC_STUB_DECL(s) _NODATA_SECTION(.intStubSect) NANO_EXC_STUB(s)
-
 /* function prototypes */
 
 extern void nano_cpu_atomic_idle(unsigned int imask);
 
 extern void nanoCpuExcConnect(unsigned int vector,
-			      void (*routine)(NANO_ESF * pEsf),
-			      NANO_EXC_STUB pExcStubMem);
+			      void (*routine)(NANO_ESF *pEsf));
 
 extern void _IntVecSet(unsigned int vector,
 		       void (*routine)(void *),
@@ -882,6 +831,13 @@ extern uint64_t _MsrRead(unsigned int msr);
 static inline void _IntLibInit(void)
 {
 }
+
+int _stub_alloc(unsigned int *ep, unsigned int limit);
+void *_get_dynamic_stub(int stub_idx, void *base_ptr);
+uint8_t _stub_idx_from_vector(int vector);
+
+/* the _idt_base_address symbol is generated via a linker script */
+extern unsigned char _idt_base_address[];
 
 #include <stddef.h> /* For size_t */
 

@@ -1,5 +1,3 @@
-/* irq_manage.c - ARM CORTEX-M3 interrupt management */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,14 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Interrupt management: enabling/disabling and dynamic ISR connecting/replacing.
-SW_ISR_TABLE_DYNAMIC has to be enabled for connecting ISRs at runtime.
+/**
+ * @file
+ * @brief ARM CORTEX-M3 interrupt management
+ *
+ *
+ * Interrupt management: enabling/disabling and dynamic ISR
+ * connecting/replacing.  SW_ISR_TABLE_DYNAMIC has to be enabled for
+ * connecting ISRs at runtime.
  */
 
 #include <nanokernel.h>
@@ -32,36 +33,6 @@ SW_ISR_TABLE_DYNAMIC has to be enabled for connecting ISRs at runtime.
 
 extern void __reserved(void);
 
-/**
- * @internal
- *
- * @brief Replace an interrupt handler by another
- *
- * An interrupt's ISR can be replaced at runtime. Care must be taken that the
- * interrupt is disabled before doing this.
- *
- * This routine will hang if <old> is not found in the table and ASSERT_ON is
- * enabled.
- *
- * @return N/A
- */
-
-void _irq_handler_set(unsigned int irq,
-						void (*old)(void *arg),
-						void (*new)(void *arg),
-						void *arg)
-{
-	int key = irq_lock();
-
-	__ASSERT(old == _sw_isr_table[irq].isr, "expected ISR not found in table");
-
-	if (old == _sw_isr_table[irq].isr) {
-		_sw_isr_table[irq].isr = new;
-		_sw_isr_table[irq].arg = arg;
-	}
-
-	irq_unlock(key);
-}
 
 /**
  *
@@ -73,7 +44,6 @@ void _irq_handler_set(unsigned int irq,
  *
  * @return N/A
  */
-
 void irq_enable(unsigned int irq)
 {
 	/* before enabling interrupts, ensure that interrupt is cleared */
@@ -90,7 +60,6 @@ void irq_enable(unsigned int irq)
  *
  * @return N/A
  */
-
 void irq_disable(unsigned int irq)
 {
 	_NvicIrqDisable(irq);
@@ -111,7 +80,6 @@ void irq_disable(unsigned int irq)
  *
  * @return N/A
  */
-
 void _irq_priority_set(unsigned int irq,
 					     unsigned int prio)
 {
@@ -130,11 +98,32 @@ void _irq_priority_set(unsigned int irq,
  *
  * @return N/A
  */
-
 void _irq_spurious(void *unused)
 {
 	ARG_UNUSED(unused);
 	__reserved();
+}
+
+#if CONFIG_SW_ISR_TABLE_DYNAMIC
+/**
+ * @internal
+ *
+ * @brief Replace an interrupt handler by another
+ *
+ * An interrupt's ISR can be replaced at runtime.
+ *
+ * @return N/A
+ */
+void _irq_handler_set(unsigned int irq,
+						void (*new)(void *arg),
+						void *arg)
+{
+	int key = irq_lock();
+
+	_sw_isr_table[irq].isr = new;
+	_sw_isr_table[irq].arg = arg;
+
+	irq_unlock(key);
 }
 
 /**
@@ -149,13 +138,14 @@ void _irq_spurious(void *unused)
  *
  * @return the interrupt line number
  */
-
-int irq_connect(unsigned int irq,
+int irq_connect_dynamic(unsigned int irq,
 					    unsigned int prio,
 					    void (*isr)(void *arg),
-					    void *arg)
+					    void *arg,
+					    uint32_t flags)
 {
-	_irq_handler_set(irq, _irq_spurious, isr, arg);
+	ARG_UNUSED(flags);
+	_irq_handler_set(irq, isr, arg);
 	_irq_priority_set(irq, prio);
 	return irq;
 }
@@ -172,8 +162,8 @@ int irq_connect(unsigned int irq,
  *
  * @return N/A
  */
-
 void _irq_disconnect(unsigned int irq)
 {
-	_irq_handler_set(irq, _sw_isr_table[irq].isr, _irq_spurious, NULL);
+	_irq_handler_set(irq, _irq_spurious, NULL);
 }
+#endif /* CONFIG_SW_ISR_TABLE_DYNAMIC */

@@ -23,8 +23,17 @@
 #include "microkernel/event.h"
 #include <toolchain.h>
 #include <sections.h>
+#include <misc/__assert.h>
 
-extern struct evstr _k_event_list[];
+extern kevent_t _k_event_list_start[];
+extern kevent_t _k_event_list_end[];
+
+#define ASSERT_EVENT_IS_VALID(e, function) do { \
+	__ASSERT((vaddr_t)e >= (vaddr_t)&_k_event_list_start,\
+				"invalid event passed to %s", function); \
+	__ASSERT((vaddr_t)e < (vaddr_t)&_k_event_list_end, \
+				"invalid event passed to %s", function); \
+} while ((0))
 
 /**
  *
@@ -34,8 +43,7 @@ extern struct evstr _k_event_list[];
  */
 void _k_event_handler_set(struct k_args *A)
 {
-	kevent_t event = A->args.e1.event;
-	struct evstr *E = _k_event_list + event;
+	struct _k_event_struct *E = (struct _k_event_struct *)A->args.e1.event;
 
 	if (E->func != NULL) {
 		if (likely(A->args.e1.func == NULL)) {
@@ -58,6 +66,8 @@ int task_event_handler_set(kevent_t event, kevent_handler_t handler)
 {
 	struct k_args A;
 
+	ASSERT_EVENT_IS_VALID(event, __func__);
+
 	A.Comm = _K_SVC_EVENT_HANDLER_SET;
 	A.args.e1.event = event;
 	A.args.e1.func = handler;
@@ -73,8 +83,7 @@ int task_event_handler_set(kevent_t event, kevent_handler_t handler)
  */
 void _k_event_test_timeout(struct k_args *A)
 {
-	kevent_t event = A->args.e1.event;
-	struct evstr *E = _k_event_list + event;
+	struct _k_event_struct *E = (struct _k_event_struct *)A->args.e1.event;
 
 	FREETIMER(A->Time.timer);
 	A->Time.rcode = RC_TIME;
@@ -90,8 +99,7 @@ void _k_event_test_timeout(struct k_args *A)
  */
 void _k_event_test(struct k_args *A)
 {
-	kevent_t event = A->args.e1.event;
-	struct evstr *E = _k_event_list + event;
+	struct _k_event_struct *E = (struct _k_event_struct *)A->args.e1.event;
 
 	if (E->status) { /* the next event can be received */
 		E->status = 0;
@@ -112,9 +120,8 @@ void _k_event_test(struct k_args *A)
 				}
 #endif
 			} else {
-				A->Time.rcode = RC_FAIL; /* already a
-								waiter
-								present */
+				/* already a waiter present */
+				A->Time.rcode = RC_FAIL;
 			}
 		} else {
 			/* Caller will not wait for the event */
@@ -123,13 +130,15 @@ void _k_event_test(struct k_args *A)
 	}
 }
 
-int _task_event_recv(kevent_t event, int32_t time)
+int task_event_recv(kevent_t event, int32_t timeout)
 {
 	struct k_args A;
 
+	ASSERT_EVENT_IS_VALID(event, __func__);
+
 	A.Comm = _K_SVC_EVENT_TEST;
 	A.args.e1.event = event;
-	A.Time.ticks = time;
+	A.Time.ticks = timeout;
 	KERNEL_ENTRY(&A);
 	return A.Time.rcode;
 }
@@ -146,7 +155,7 @@ int _task_event_recv(kevent_t event, int32_t time)
  */
 void _k_do_event_signal(kevent_t event)
 {
-	struct evstr *E = _k_event_list + event;
+	struct _k_event_struct *E = (struct _k_event_struct *)event;
 	struct k_args *A = E->waiter;
 	int ret_val = 1; /* If no handler is available, then ret_val is 1 by default */
 
@@ -186,6 +195,7 @@ void _k_do_event_signal(kevent_t event)
 void _k_event_signal(struct k_args *A)
 {
 	kevent_t event = A->args.e1.event;
+
 	_k_do_event_signal(event);
 	A->Time.rcode = RC_OK;
 }
@@ -193,6 +203,8 @@ void _k_event_signal(struct k_args *A)
 int task_event_send(kevent_t event)
 {
 	struct k_args A;
+
+	ASSERT_EVENT_IS_VALID(event, __func__);
 
 	A.Comm = _K_SVC_EVENT_SIGNAL;
 	A.args.e1.event = event;
@@ -204,5 +216,8 @@ FUNC_ALIAS(isr_event_send, fiber_event_send, void);
 
 void isr_event_send(kevent_t event)
 {
-	nano_isr_stack_push(&_k_command_stack, (uint32_t)event);
+	ASSERT_EVENT_IS_VALID(event, __func__);
+
+	nano_isr_stack_push(&_k_command_stack,
+						(uint32_t)event | KERNEL_CMD_EVENT_TYPE);
 }

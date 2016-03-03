@@ -1,5 +1,3 @@
-/* sw_isr_table.h - software-managed ISR table */
-
 /*
  * Copyright (c) 2014, Wind River Systems, Inc.
  *
@@ -16,13 +14,19 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Data types for a software-managed ISR table, with a parameter per-ISR.
+/**
+ * @file
+ * @brief Software-managed ISR table
+ *
+ * Data types for a software-managed ISR table, with a parameter per-ISR.
  */
 
 #ifndef _SW_ISR_TABLE__H_
 #define _SW_ISR_TABLE__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #if !defined(_ASMLANGUAGE)
 /*
@@ -37,7 +41,16 @@ struct _IsrTableEntry {
 
 typedef struct _IsrTableEntry _IsrTableEntry_t;
 
+#ifdef CONFIG_ARC
+extern _IsrTableEntry_t _sw_isr_table[CONFIG_NUM_IRQS - 16];
+#else
 extern _IsrTableEntry_t _sw_isr_table[CONFIG_NUM_IRQS];
+#endif
+
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SW_ISR_TABLE__H_ */

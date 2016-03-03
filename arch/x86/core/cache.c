@@ -1,5 +1,3 @@
-/* cache.c - cache manipulation */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -15,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/*
-DESCRIPTION
-This module contains functions for manipulation caches.
+/**
+ * @file
+ * @brief Cache manipulation
+ *
+ * This module contains functions for manipulation caches.
  */
 
 #include <nanokernel.h>
@@ -44,8 +44,8 @@ This module contains functions for manipulation caches.
  * sys_cache_flush() iterates on the cache lines, a cache line alignment for
  * both is optimal.
  *
- * The cache line size is specified via the CONFIG_CACHE_LINE_SIZE kconfig
- * option, or detected at runtime.
+ * The cache line size is specified either via the CONFIG_CACHE_LINE_SIZE
+ * kconfig option or it is detected at runtime.
  *
  * @return N/A
  */
@@ -81,7 +81,7 @@ static void init_cache_flush(void)
 	}
 }
 #else
-#define init_cache_flush() do { } while((0))
+#define init_cache_flush() do { } while ((0))
 FUNC_ALIAS(_cache_flush_clflush, sys_cache_flush, void);
 #endif
 
@@ -94,7 +94,7 @@ static void init_cache_line_size(void)
 	sys_cache_line_size = _cache_line_size_get();
 }
 #else
-#define init_cache_line_size() do { } while((0))
+#define init_cache_line_size() do { } while ((0))
 #endif
 
 static int init_cache(struct device *unused)
@@ -107,7 +107,6 @@ static int init_cache(struct device *unused)
 	return 0;
 }
 
-DECLARE_DEVICE_INIT_CONFIG(cache, "", init_cache, NULL);
-pre_kernel_early_init(cache, NULL);
+SYS_INIT(init_cache, PRIMARY, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
 #endif /* CONFIG_CLFLUSH_DETECT || CONFIG_CACHE_LINE_SIZE_DETECT */

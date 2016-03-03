@@ -1,0 +1,5 @@
+
+config  BOARD_MINNOWBOARD
+        bool "Minnowboard Max"
+        select SOC_ATOM
+	depends on X86

@@ -1,5 +1,3 @@
-/* exc.h - exception/interrupt context helpers for Cortex-M CPUs */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Exception/interrupt context helpers.
+/**
+ * @file
+ * @brief Exception/interrupt context helpers for Cortex-M CPUs
+ *
+ * Exception/interrupt context helpers.
  */
 
 #ifndef _ARM_CORTEXM_ISR__H_
@@ -26,6 +26,10 @@ Exception/interrupt context helpers.
 
 #include <arch/cpu.h>
 #include <asm_inline.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef _ASMLANGUAGE
 
@@ -36,22 +40,23 @@ Exception/interrupt context helpers.
 /**
  *
  * @brief Find out if running in an ISR context
- *
+	 *
  * The current executing vector is found in the IPSR register. We consider the
- * IRQs (exception 16 and up), and the PendSV and SYSTICK exceptions, to be
- * interrupts. Taking a fault within an exception is also considered in
+ * IRQs (exception 16 and up), and the SVC, PendSV, and SYSTICK exceptions,
+ * to be interrupts. Taking a fault within an exception is also considered in
  * interrupt context.
  *
  * @return 1 if in ISR, 0 if not.
- *
- * \NOMANUAL
  */
 static ALWAYS_INLINE int _IsInIsr(void)
 {
 	uint32_t vector = _IpsrGet();
 
-	/* IRQs + PendSV + SYSTICK are interrupts */
-	return (vector > 13) || (vector && _ScbIsNestedExc());
+	/*
+	 * IRQs + PendSV (14) + SVC (11) + SYSTICK (15) are interrupts.
+	 * Vectors 12 and 13 are reserved, we'll never be in there
+	 */
+	return (vector > 10) || (vector && _ScbIsNestedExc());
 }
 
 /**
@@ -63,10 +68,7 @@ static ALWAYS_INLINE int _IsInIsr(void)
  * Enable fault exceptions.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void _ExcSetup(void)
 {
 	_ScbExcPrioSet(_EXC_PENDSV, _EXC_PRIO(0xff));
@@ -81,5 +83,10 @@ static ALWAYS_INLINE void _ExcSetup(void)
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 
 #endif /* _ARM_CORTEXM_ISR__H_ */

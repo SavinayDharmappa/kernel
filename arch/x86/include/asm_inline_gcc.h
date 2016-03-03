@@ -19,6 +19,10 @@
 #ifndef _ASM_INLINE_GCC_H
 #define _ASM_INLINE_GCC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * The file must not be included directly
  * Include asm_inline.h instead
@@ -26,8 +30,8 @@
 
 #ifdef _ASMLANGUAGE
 
-#define SYS_NANO_CPU_EXC_CONNECT(handler,vector) \
-NANO_CPU_EXC_CONNECT_NO_ERR(handler,vector,0)
+#define SYS_NANO_CPU_EXC_CONNECT(handler, vector) \
+NANO_CPU_EXC_CONNECT_NO_ERR(handler, vector, 0)
 
 #else /* !_ASMLANGUAGE */
 
@@ -36,10 +40,7 @@ NANO_CPU_EXC_CONNECT_NO_ERR(handler,vector,0)
  * @brief Return the current value of the EFLAGS register
  *
  * @return the EFLAGS register.
- *
- * \NOMANUAL
  */
-
 static inline unsigned int EflagsGet(void)
 {
 	unsigned int eflags; /* EFLAGS register contents */
@@ -65,7 +66,6 @@ static inline unsigned int EflagsGet(void)
  *
  * @return N/A
  */
-
 static inline void _FpAccessDisable(void)
 {
 	void *tempReg;
@@ -91,7 +91,6 @@ static inline void _FpAccessDisable(void)
  *
  * @return N/A
  */
-
 static inline void _do_fp_ctx_save(int flags, void *preemp_float_reg)
 {
 #ifdef CONFIG_SSE
@@ -121,7 +120,6 @@ static inline void _do_fp_ctx_save(int flags, void *preemp_float_reg)
  *
  * @return N/A
  */
-
 static inline void _do_fp_ctx_init(int flags)
 {
 	/* initialize x87 FPU */
@@ -142,4 +140,9 @@ static inline void _do_fp_ctx_init(int flags)
 #endif /* CONFIG_FP_SHARING */
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ASM_INLINE_GCC_H */

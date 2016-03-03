@@ -21,6 +21,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <toolchain.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -112,6 +113,9 @@ struct _k_mbox_struct {
 	struct k_args *writers;
 	struct k_args *readers;
 	int count;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_mbox_struct *next;
+#endif
 };
 
 struct _k_mutex_struct {
@@ -122,13 +126,23 @@ struct _k_mutex_struct {
 	struct k_args *waiters;
 	int count;
 	int num_conflicts;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_mutex_struct *next;
+#endif
 };
 
+/*
+ * Semaphore structure. Must be aligned on a 4-byte boundary, since this is what
+ * the microkernel server's command stack processing requires.
+ */
 struct _k_sem_struct {
 	struct k_args *waiters;
 	int level;
 	int count;
-};
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_sem_struct *next;
+#endif
+} __aligned(4);
 
 struct _k_fifo_struct {
 	int Nelms;
@@ -141,6 +155,9 @@ struct _k_fifo_struct {
 	int num_used;
 	int high_watermark;
 	int count;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_fifo_struct *next;
+#endif
 };
 
 /* Pipe-related structures */
@@ -165,9 +182,11 @@ struct _k_pipe_marker_list {
 
 typedef enum {
 	BUFF_EMPTY, /* buffer is empty, disregarding the pending data Xfers
-		       (reads) still finishing up */
+		     * (reads) still finishing up
+		     */
 	BUFF_FULL, /* buffer is full, disregarding the pending data Xfers
-		      (writes) still finishing up */
+		    * (writes) still finishing up
+		    */
 	BUFF_OTHER
 } _K_PIPE_BUFF_STATE;
 
@@ -200,6 +219,9 @@ struct _k_pipe_struct {
 	struct k_args *readers;
 	struct _k_pipe_desc desc;
 	int count;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_pipe_struct *next;
+#endif
 };
 
 /* Memory map related structure */
@@ -213,7 +235,35 @@ struct _k_mem_map_struct {
 	int num_used;
 	int high_watermark;
 	int count;
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+	struct _k_mem_map_struct *next;
+#endif
 };
+
+/*
+ * Event structure. Must be aligned on a 4-byte boundary, since this is what
+ * the microkernel server's command stack processing requires.
+ */
+struct _k_event_struct {
+	int status;
+	kevent_handler_t func;
+	struct k_args *waiter;
+	int count;
+} __aligned(4);
+
+#ifdef CONFIG_DEBUG_TRACING_KERNEL_OBJECTS
+struct _k_mbox_struct *_track_list_micro_mbox;
+
+struct _k_mutex_struct *_track_list_micro_mutex;
+
+struct _k_sem_struct *_track_list_micro_sem;
+
+struct _k_fifo_struct *_track_list_micro_fifo;
+
+struct _k_pipe_struct *_track_list_micro_pipe;
+
+struct _k_mem_map_struct *_track_list_micro_mem_map;
+#endif
 
 /**
  * @endcond

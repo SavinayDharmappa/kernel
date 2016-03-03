@@ -23,23 +23,40 @@ config LOAPIC
 	bool "LOAPIC"
 	default n
 	select IOAPIC
-	depends on X86_32
+	depends on X86
 	help
 	This option selects local APIC as the interrupt controller.
-
-config LOAPIC_DEBUG
-	bool "LOAPIC Debug"
-	default n
-	depends on LOAPIC
-	help
-	This option enable debugging for the LOAPIC driver.
 
 config LOAPIC_BASE_ADDRESS
 	hex "Local APIC Base Address"
 	default 0xFEE00000
-	depends on LOAPIC
+	depends on LOAPIC || MVIC
 	help
 	This option specifies the base address of the Local APIC device.
+
+config LOAPIC_SPURIOUS_VECTOR
+	bool "Handle LOAPIC spurious interrupts"
+	default n
+	depends on LOAPIC
+	help
+	A special situation may occur when a processor raises its task
+	priority to be greater than or equal to the level of the
+	interrupt for which the processor INTR signal is currently being
+	asserted. If at the time the INTA cycle is issued, the
+	interrupt that was to be dispensed has become masked (programmed
+	by software), the local APIC will deliver a spurious-interrupt
+	vector. Dispensing the spurious-interrupt vector does not affect
+	the ISR, so the handler for this vector should return without an EOI.
+	From x86 manual Volume 3 Section 10.9.
+
+config LOAPIC_SPURIOUS_VECTOR_ID
+	int "LOAPIC spurious vector ID"
+	default -1
+	depends on LOAPIC_SPURIOUS_VECTOR
+	help
+	IDT vector to use for spurious LOAPIC interrupts. Note that some
+	arches (P6, Pentium) ignore the low 4 bits and fix them at 0xF.
+	If this value is left at -1 the last entry in the IDT will be used.
 
 config IOAPIC
 	bool "IO-APIC"
@@ -59,7 +76,7 @@ config IOAPIC_DEBUG
 config IOAPIC_BASE_ADDRESS
 	hex "IO-APIC Base Address"
 	default 0xFEC00000
-	depends on IOAPIC
+	depends on IOAPIC || MVIC
 	help
 	This option specifies the base address of the IO-APIC device.
 
@@ -73,6 +90,17 @@ config IOAPIC_NUM_RTES
 	kernel, regardless of the number provided by the hardware itself. For
 	most efficient usage of memory, it should match the number of IRQ lines
 	needed by devices connected to the IO-APIC.
+
+config  MVIC
+	bool "Intel Quark D2000 Interrupt Controller (MVIC)"
+	default n
+	depends on X86
+	help
+	The MVIC (Intel Quark microcontroller D2000 Interrupt Controller) is
+	configured by default to support 32 external interrupt lines. Unlike the
+	traditional IA LAPIC/IOAPIC, the interrupt vectors in MVIC are fixed and
+	not programmable. In addition, the priorities of these interrupt
+	lines are also fixed.
 
 config ARCV2_INTERRUPT_UNIT
 	bool "ARCv2 Interrupt Unit"

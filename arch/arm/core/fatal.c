@@ -1,5 +1,3 @@
-/* fatal.c - nanokernel fatal error handler for ARM Cortex-M */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module provides the _NanoFatalErrorHandler() routine for ARM Cortex-M.
+/**
+ * @file
+ * @brief Nanokernel fatal error handler for ARM Cortex-M
+ *
+ * This module provides the _NanoFatalErrorHandler() routine for ARM Cortex-M.
  */
 
 #include <toolchain.h>
@@ -39,17 +39,6 @@ This module provides the _NanoFatalErrorHandler() routine for ARM Cortex-M.
  * the caller does not have a NANO_ESF to pass
  */
 const NANO_ESF _default_esf = {
-#if defined(CONFIG_ARM_DEBUG_ESF)
-	{0xdeaddead}, /* r13/sp */
-	{0xdeaddead}, /* r4/v1 */
-	{0xdeaddead}, /* r5/v2 */
-	{0xdeaddead}, /* r6/v3 */
-	{0xdeaddead}, /* r7/v4 */
-	{0xdeaddead}, /* r8/v5 */
-	{0xdeaddead}, /* r9/v6 */
-	{0xdeaddead}, /* r10/v7 */
-	{0xdeaddead}, /* r11/v8 */
-#endif
 	{0xdeaddead}, /* r0/a1 */
 	{0xdeaddead}, /* r1/a2 */
 	{0xdeaddead}, /* r2/a3 */
@@ -73,15 +62,13 @@ const NANO_ESF _default_esf = {
  * fatal error does not have a hardware generated ESF, the caller should either
  * create its own or use a pointer to the global default ESF <_default_esf>.
  *
- * @return This function does not return.
+ * @param reason the reason that the handler was called
+ * @param pEsf pointer to the exception stack frame
  *
- * \NOMANUAL
+ * @return This function does not return.
  */
-
-FUNC_NORETURN void _NanoFatalErrorHandler(
-	unsigned int reason, /* reason that handler was called */
-	const NANO_ESF *pEsf /* pointer to exception stack frame */
-	)
+FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
+					  const NANO_ESF *pEsf)
 {
 	switch (reason) {
 	case _NANO_ERR_INVALID_TASK_EXIT:

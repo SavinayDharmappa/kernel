@@ -21,6 +21,9 @@ Each testcase.ini block can define the following key/value pairs:
     functional domains but can be anything. Command line invocations
     of this script can filter the set of tests to run based on tag.
 
+  skip = <True|False>
+    skip testcase unconditionally. This can be used for broken tests.
+
   extra_args = <list of extra arguments>
     Extra arguments to pass to Make when building or running the
     test case.
@@ -306,9 +309,9 @@ class SizeCalculator:
 
     alloc_sections = ["bss", "noinit"]
     rw_sections = ["datas", "initlevel", "_k_mem_map_ptr", "_k_pipe_ptr",
-                   "_k_task_ptr", "_k_task_list", "initlevel"]
+                   "_k_task_ptr", "_k_task_list", "initlevel", "_k_event_list"]
     # These get copied into RAM only on non-XIP
-    ro_sections = ["text", "ctors", "rodata", "devconfig"]
+    ro_sections = ["text", "ctors", "init_array", "rodata", "devconfig"]
 
     def __init__(self, filename):
         """Constructor
@@ -619,7 +622,7 @@ class MakeGenerator:
         """
         args = ti.test.extra_args[:]
         args.extend(["ARCH=%s" % ti.platform.arch.name,
-                     "PLATFORM_CONFIG=%s" % ti.platform.name])
+                     "BOARD=%s" % ti.platform.name])
         if ti.platform.qemu_support and not ti.build_only and not build_only:
             self.add_qemu_goal(ti.name, ti.test.code_location, ti.outdir,
                                args, ti.test.timeout)
@@ -712,6 +715,7 @@ platform_valid_keys = {"qemu_support" : {"type" : "bool", "default" : False},
 testcase_valid_keys = {"tags" : {"type" : "set", "required" : True},
                        "extra_args" : {"type" : "list"},
                        "build_only" : {"type" : "bool", "default" : False},
+                       "skip" : {"type" : "bool", "default" : False},
                        "timeout" : {"type" : "int", "default" : 60},
                        "arch_whitelist" : {"type" : "set"},
                        "arch_exclude" : {"type" : "set"},
@@ -846,12 +850,12 @@ class SanityConfigParser:
 class Platform:
     """Class representing metadata for a particular platform
 
-    Maps directly to PLATFORM_CONFIG when building"""
+    Maps directly to BOARD when building"""
     def __init__(self, arch, name, plat_dict):
         """Constructor.
 
         @param arch Architecture object for this platform
-        @param name String name for this platform, same as PLATFORM_CONFIG
+        @param name String name for this platform, same as BOARD
         @param plat_dict SanityConfigParser output on the relevant section
             in the architecture configuration file which has lots of metadata.
             See the Architecture class.
@@ -955,6 +959,7 @@ class TestCase:
         self.extra_args = tc_dict["extra_args"]
         self.arch_whitelist = tc_dict["arch_whitelist"]
         self.arch_exclude = tc_dict["arch_exclude"]
+        self.skip = tc_dict["skip"]
         self.platform_exclude = tc_dict["platform_exclude"]
         self.platform_whitelist = tc_dict["platform_whitelist"]
         self.config_whitelist = tc_dict["config_whitelist"]
@@ -1115,6 +1120,9 @@ class TestSuite:
                 for plat in arch.platforms:
                     instance = TestInstance(tc, plat, self.outdir)
 
+                    if tc.skip:
+                        continue
+
                     if tag_filter and not tc.tags.intersection(tag_filter):
                         continue
 
@@ -1146,8 +1154,9 @@ class TestSuite:
                         continue
 
                     for cw in tc.config_whitelist:
-                        args = ["ARCH=" + plat.arch.name,
-                                "PLATFORM_CONFIG=" + plat.name, "initconfig"]
+                        args = tc.extra_args[:]
+                        args.extend(["ARCH=" + plat.arch.name,
+                                "BOARD=" + plat.name, "initconfig"])
                         # FIXME would be nice to use a common outdir for this so that
                         # conf, gen_idt, etc aren't rebuilt for every plat/ktype combo,
                         # need a way to avoid different Make processe from clobbering
@@ -1181,6 +1190,10 @@ class TestSuite:
                 instance_list = []
                 for plat in arch.platforms:
                     instance = TestInstance(tc, plat, self.outdir)
+
+                    if tc.skip:
+                        discards[instance] = "Skip filter"
+                        continue
 
                     if tag_filter and not tc.tags.intersection(tag_filter):
                         discards[instance] = "Command line testcase tag filter"
@@ -1611,10 +1624,10 @@ def main():
                                         (args.footprint_threshold / 100.0)):
                 continue
 
-            info("{:<25} {:<50} {}{}{}: {} is now {} {:+.2%}".format(
+            info("{:<25} {:<50} {}{}{}: {} {:+}, is now {} {:+.2%}".format(
                  i.platform.name, i.test.name, COLOR_YELLOW,
                  "INFO" if args.all_deltas else "WARNING", COLOR_NORMAL,
-                 metric, value, percentage))
+                 metric, delta, value, percentage))
             warnings += 1
 
     if warnings:

@@ -16,8 +16,6 @@
  * limitations under the License.
  */
 
-#ifdef CONFIG_TASK_MONITOR
-
 #include <micro_private.h>
 #include <microkernel/ticks.h>
 #include <drivers/system_timer.h>
@@ -30,12 +28,10 @@ static const int k_monitor_capacity = CONFIG_TASK_MONITOR_CAPACITY;
 const int _k_monitor_mask = CONFIG_TASK_MONITOR_MASK;
 
 static struct k_mrec *k_monitor_wptr = k_monitor_buff;
-static int k_monitor_nrec = 0;
-static int K_monitor_wind = 0;
+static int k_monitor_nrec;
+static int K_monitor_wind;
 
-k_task_monitor_hook_t _k_task_switch_callback = NULL;
-
-extern const int _k_num_events;
+k_task_monitor_hook_t _k_task_switch_callback;
 
 void task_monitor_hook_set(k_task_monitor_hook_t func)
 {
@@ -48,7 +44,7 @@ void _k_task_monitor(struct k_task *X, uint32_t D)
 	if (!_k_debug_halt)
 #endif
 	{
-		k_monitor_wptr->time = _sys_clock_cycle_get();
+		k_monitor_wptr->time = sys_cycle_get_32();
 		k_monitor_wptr->data1 = X->id;
 		k_monitor_wptr->data2 = D;
 		if (++K_monitor_wind == k_monitor_capacity) {
@@ -62,7 +58,7 @@ void _k_task_monitor(struct k_task *X, uint32_t D)
 		}
 	}
 	if ((_k_task_switch_callback != NULL) && (D == 0)) {
-		(_k_task_switch_callback)(X->id, _sys_clock_cycle_get());
+		(_k_task_switch_callback)(X->id, sys_cycle_get_32());
 	}
 }
 
@@ -72,13 +68,18 @@ void _k_task_monitor_args(struct k_args *A)
 	if (!_k_debug_halt)
 #endif
 	{
-		k_monitor_wptr->time = _sys_clock_cycle_get();
+		int cmd_type;
 
-		if ((uint32_t)A < _k_num_events) {
+		k_monitor_wptr->time = sys_cycle_get_32();
+		cmd_type = (int)A & KERNEL_CMD_TYPE_MASK;
+
+		if (cmd_type == KERNEL_CMD_EVENT_TYPE) {
 			k_monitor_wptr->data2 = MO_EVENT | (uint32_t)A;
+			k_monitor_wptr->ptr = (void *)0;
 		} else {
 			k_monitor_wptr->data1 = _k_current_task->id;
-			k_monitor_wptr->data2 = MO_LCOMM | A->Comm;
+			k_monitor_wptr->data2 = MO_LCOMM;
+			k_monitor_wptr->ptr = A->Comm;
 		}
 
 		if (++K_monitor_wind == k_monitor_capacity) {
@@ -99,11 +100,10 @@ void _k_task_monitor_read(struct k_args *A)
 	A->args.z4.nrec = k_monitor_nrec;
 	if (A->args.z4.rind < k_monitor_nrec) {
 		int i = K_monitor_wind - k_monitor_nrec + A->args.z4.rind;
+
 		if (i < 0) {
 			i += k_monitor_capacity;
 		}
 		A->args.z4.mrec = k_monitor_buff[i];
 	}
 }
-
-#endif /* CONFIG_TASK_MONITOR */

@@ -29,7 +29,6 @@ config  KERNEL_BIN_NAME
 	help
 	This option sets the name of the generated kernel binary.
 
-
 config  HAVE_CUSTOM_LINKER_SCRIPT
 	prompt "Custom linker scripts provided"
 	def_bool n
@@ -94,6 +93,12 @@ config TOOLCHAIN_VARIANT
 	For optimized compilers with reduced features, specify the name
 	of the variant.
 
+config CPLUSPLUS
+	bool "Enable C++ support for the application"
+	default n
+	help
+	This option enables the use of applications built with C++.
+
 choice
 prompt "C Library"
 default MINIMAL_LIBC
@@ -141,6 +146,22 @@ config  DEBUG
 	Build a kernel suitable for debugging.  Right now, this option
 	only disables optimization, more debugging variants can be selected
 	from here to allow more debugging.
+
+config  TASK_DEBUG
+	bool
+	prompt "Task debugging [EXPERIMENTAL]"
+	default n
+	help
+	This option allows execution of all tasks (with the exception of
+	essential system tasks) to be suspended so that debugging operations
+	can be performed.
+
+config STACK_USAGE
+	bool "Generate stack usage information"
+	default n
+	help
+	Generate  an extra file that specifies the maximum amount of stack used,
+	on a per-function basis.
 
 config PRINTK
 	bool
@@ -195,76 +216,17 @@ config ASSERT_LEVEL
 	Level 1: on + warning in every file that includes __assert.h
 	Level 2: on + no warning
 
-source "debug/Kconfig"
+config DEBUG_TRACING_KERNEL_OBJECTS
+	bool
+	prompt "Debug tracing object"
+	default n
+	help
+	This option enable the feature for tracing kernel objects. This option
+	is for debug purposes and increase the memory footprint of the kernel.
+
+source "misc/debug/Kconfig"
 
 endmenu
-
-menu "Safe memory access"
-
-config MEM_SAFE
-	bool
-	prompt "Enable safe memory access"
-	default n
-	help
-	Add the routines available in mem_safe.h to the system. This is added as a
-	kconfig option instead of simply linking against the library because some
-	implementations might require initialization.
-
-choice
-prompt "Safe memory access implementation"
-depends on MEM_SAFE
-default MEM_SAFE_CHECK_BOUNDARIES
-
-config MEM_SAFE_CHECK_BOUNDARIES
-	bool
-	prompt "Software validation of memory access within memory regions"
-	help
-	This implementation checks the application image's text/rodata boundaries
-	for its read-only region and the data/bss/noinit boundaries for its
-	read-write region, in software.
-
-	Other regions can be added as needed by using the sys_mem_safe_region_add()
-	API. The number of regions that can be added is controlled via the
-	MEM_SAFE_NUM_REGIONS kconfig option.
-
-	This implementation requires initialization and thus consumes some boot
-	time.
-
-endchoice
-
-config MEM_SAFE_NUM_EXTRA_REGIONS
-	int
-	prompt "Number of safe memory access regions that can be added at runtime"
-	depends on MEM_SAFE_CHECK_BOUNDARIES
-	default 0
-	help
-	The functions available in mem_safe.h check if memory is withing read-only
-	or read-write regions before accessing it instead of crashing. The kernel
-	image is added as a valid region automatically, but other regions can be
-	added if the application makes access to additional memory outside of the
-	image's boundaries.
-
-endmenu
-
-config BOOTLOADER_KEXEC
-	bool
-	prompt "Boot using Linux kexec() system call"
-	depends on X86_32
-	default n
-	help
-	This option signifies that Linux boots the kernel using kexec system call
-	and utility. This method is used to boot the kernel over the network.
-
-config BOOTLOADER_UNKNOWN
-	bool
-	prompt "Generic boot loader support"
-	default n
-	depends on X86_32
-	help
-	This option signifies that the target has a generic bootloader
-	or that it supports multiple ways of booting and it isn't clear
-	at build time which method is to be used. When this option is enabled
-	the platform may have to do extra work to ensure a proper startup.
 
 menu "System Monitoring Options"
 
@@ -298,11 +260,34 @@ config  CPU_CLOCK_FREQ_MHZ
 
 endmenu
 
+menu "Boot Options"
+
+config BOOTLOADER_KEXEC
+	bool
+	prompt "Boot using Linux kexec() system call"
+	depends on X86
+	default n
+	help
+	This option signifies that Linux boots the kernel using kexec system call
+	and utility. This method is used to boot the kernel over the network.
+
+config BOOTLOADER_UNKNOWN
+	bool
+	prompt "Generic boot loader support"
+	default n
+	depends on X86
+	help
+	This option signifies that the target has a generic bootloader
+	or that it supports multiple ways of booting and it isn't clear
+	at build time which method is to be used. When this option is enabled
+	the platform may have to do extra work to ensure a proper startup.
+
 config REBOOT
-	bool "Reboot functionalities"
+	bool "Reboot functionality"
 	default n
 	select SYSTEM_CLOCK_DISABLE
 	help
 	Enable the sys_reboot() API. Enabling this can drag in other subsystems
 	needed to perform a "safe" reboot (e.g. SYSTEM_CLOCK_DISABLE, to stop the
 	system clock before issuing a reset).
+endmenu

@@ -40,24 +40,13 @@ extern "C" {
 /**
  * @cond internal
  */
-extern int _task_mbox_put(kmbox_t mbox,
-		                  kpriority_t prio,
-		                  struct k_msg *M,
-		                  int32_t time);
-
-extern int _task_mbox_get(kmbox_t mbox, struct k_msg *M, int32_t time);
-
 extern void _task_mbox_block_put(kmbox_t mbox,
-		                         kpriority_t prio,
-		                         struct k_msg *M,
-		                         ksem_t sem);
+					kpriority_t prio,
+					struct k_msg *M,
+					ksem_t sem);
 
 extern void _task_mbox_data_get(struct k_msg *M);
 
-extern int _task_mbox_data_block_get(struct k_msg *M,
-				 struct k_block *rxblock,
-				 kmemory_pool_t pid,
-				 int32_t time);
 /**
  * @brief Initializer for microkernel mailbox
  */
@@ -76,80 +65,39 @@ extern int _task_mbox_data_block_get(struct k_msg *M,
  *
  * This routine sends a message to a mailbox and looks for a matching receiver.
  *
- * @param b mailbox
- * @param p priority of data transfer
- * @param m pointer to message to send
+ * @param mbox Mailbox.
+ * @param prio Priority of data transfer.
+ * @param M Pointer to message to send.
+ * @param timeout Affects the action taken should there not be a waiting
+ * receiver. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. Otherwise wait up to the specified number of
+ * ticks before timing out.
  *
- * @return RC_OK, RC_FAIL on success, failure respectively
+ * @return RC_OK Successfully delivered message
+ * @return RC_TIME Timed out while waiting to deliver message
+ * @return RC_FAIL Failed to immediately deliver message when
+ * @a timeout = TICKS_NONE
  */
-#define task_mbox_put(b, p, m) _task_mbox_put(b, p, m, TICKS_NONE)
-
-/**
- * @brief Send a message to a mailbox and wait
- *
- * This routine sends a message to a mailbox and looks for a matching receiver.
- *
- * @param b mailbox
- * @param p priority of data transfer
- * @param m pointer to message to send
- *
- * @return RC_OK, RC_FAIL on success, failure respectively
- */
-#define task_mbox_put_wait(b, p, m) _task_mbox_put(b, p, m, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-
-/**
- * @brief Send a message to a mailbox and wait for timeout
- *
- * This routine sends a message to a mailbox and looks for a matching receiver.
- *
- * @param b mailbox
- * @param p priority of data transfer
- * @param m pointer to message to send
- * @param t maximum number of ticks to wait
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-#define task_mbox_put_wait_timeout(b, p, m, t) _task_mbox_put(b, p, m, t)
-#endif
-
-/**
- * @brief Gets struct k_msg message header structure information from
- * a mailbox
- *
- * @param b mailbox
- * @param m pointer to message
- *
- * @return RC_OK, RC_FAIL on success, failure respectively
- */
-#define task_mbox_get(b, m) _task_mbox_get(b, m, TICKS_NONE)
-
-/**
- * @brief Gets struct k_msg message header structure information from
- * a mailbox and wait
- *
- * @param b mailbox
- * @param m pointer to message
- *
- * @return RC_OK, RC_FAIL on success, failure respectively
- */
-#define task_mbox_get_wait(b, m) _task_mbox_get(b, m, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
+extern int task_mbox_put(kmbox_t mbox, kpriority_t prio,
+				struct k_msg *M, int32_t timeout);
 
 /**
  * @brief Gets struct k_msg message header structure information from
  * a mailbox and wait with timeout.
  *
- * @param b mailbox
- * @param m pointer to message
- * @param t maximum number of ticks to wait
+ * @param mbox Mailbox
+ * @param M Pointer to message
+ * @param timeout Affects the action taken should there not be a waiting
+ * sender. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. Otherwise wait up to the specified number of
+ * ticks before timing out.
  *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
+ * @return RC_OK Successfully received message
+ * @return RC_TIME Timed out while waiting to receive message
+ * @return RC_FAIL Failed to immediately receive message when
+ * @a timeout = TICKS_NONE
  */
-#define task_mbox_get_wait_timeout(b, m, t) _task_mbox_get(b, m, t)
-#endif
+extern int task_mbox_get(kmbox_t mbox, struct k_msg *M, int32_t timeout);
 
 /**
  * @brief Send a message asynchronously to a mailbox
@@ -184,44 +132,23 @@ extern int _task_mbox_data_block_get(struct k_msg *M,
 #define task_mbox_data_get(m) _task_mbox_data_get(m)
 
 /**
- * @brief Get the mailbox data and place in a memory pool block
+ * @brief Retrieves message data into a block, with time limited waiting
  *
- * @param m message from which to get data
- * @param b block
- * @param p pool
+ * @param M Message from which to get data
+ * @param block Block
+ * @param pool_id Memory pool name
+ * @param timeout Affects the action taken should there not be a waiting
+ * sender. If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then
+ * wait as long as necessary. Otherwise wait up to the specified number of
+ * ticks before timing out.
  *
- * @return RC_OK upon success, RC_FAIL upon failure
+ * @retval RC_OK Successful retrieval of message data
+ * @retval RC_TIME Timed out while waiting to receive message data
+ * @retval RC_FAIL Failed to immediately receive message data when
+ * @a timeout = TICKS_NONE
  */
-#define task_mbox_data_block_get(m, b, p) \
-		_task_mbox_data_block_get(m, b, p, TICKS_NONE)
-
-/**
- * @brief Get the mailbox data and place in a memory pool block and wait
- *
- * @param m message from which to get data
- * @param b block
- * @param p pool
- *
- * @return RC_OK upon success, RC_FAIL upon failure
- */
-#define task_mbox_data_block_get_wait(m, b, p) \
-	_task_mbox_data_block_get(m, b, p, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-/**
- * @brief Get the mailbox data and place in a memory pool block and wait
- *
- * @param m message from which to get data
- * @param b block
- * @param p pool
- * @param t timeout
- *
- * @return RC_OK upon success, RC_FAIL upon failure
- */
-#define task_mbox_data_block_get_wait_timeout(m, b, p, t) \
-		_task_mbox_data_block_get(m, b, p, t)
-#endif
-
+extern int task_mbox_data_block_get(struct k_msg *M, struct k_block *block,
+					kmemory_pool_t pool_id, int32_t timeout);
 
 /**
  * @brief Define a private microkernel mailbox
@@ -232,8 +159,8 @@ extern int _task_mbox_data_block_get(struct k_msg *M,
  * @param name Name of the mailbox
  */
 #define DEFINE_MAILBOX(name) \
-       struct _k_mbox_struct _k_mbox_obj_##name = __K_MAILBOX_DEFAULT; \
-       const kmbox_t name = (kmbox_t)&_k_mbox_obj_##name;
+	struct _k_mbox_struct _k_mbox_obj_##name = __K_MAILBOX_DEFAULT; \
+	const kmbox_t name = (kmbox_t)&_k_mbox_obj_##name;
 
 #ifdef __cplusplus
 }

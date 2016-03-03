@@ -127,9 +127,9 @@ void _k_fifo_enque_request(struct k_args *A)
 #endif
 	} else {
 		if (likely(A->Time.ticks != TICKS_NONE)) {
-				A->Ctxt.task = _k_current_task;
-				A->priority = _k_current_task->priority;
-				_k_state_bit_set(_k_current_task, TF_ENQU);
+			A->Ctxt.task = _k_current_task;
+			A->priority = _k_current_task->priority;
+			_k_state_bit_set(_k_current_task, TF_ENQU);
 			INSERT_ELM(Q->waiters, A);
 #ifdef CONFIG_SYS_CLOCK_EXISTS
 			if (A->Time.ticks == TICKS_UNLIMITED)
@@ -145,15 +145,12 @@ void _k_fifo_enque_request(struct k_args *A)
 	}
 }
 
-int _task_fifo_put(kfifo_t queue, /* FIFO queue */
-		void *data,   /* ptr to data to add to queue */
-		int32_t time  /* maximum number of ticks to wait */
-		)
+int task_fifo_put(kfifo_t queue, void *data, int32_t timeout)
 {
 	struct k_args A;
 
 	A.Comm = _K_SVC_FIFO_ENQUE_REQUEST;
-	A.Time.ticks = time;
+	A.Time.ticks = timeout;
 	A.args.q1.data = (char *)data;
 	A.args.q1.queue = queue;
 
@@ -279,26 +276,12 @@ void _k_fifo_deque_request(struct k_args *A)
 	}
 }
 
-/**
- *
- * @brief FIFO dequeue request
- *
- * This routine tries to read a data element from the FIFO.
- *
- * If the FIFO is not empty, the oldest entry is removed and copied to the
- * address provided by the caller.
- * @param queue FIFO queue
- * @param data Where to store FIFO entry
- * @param time Maximum number of ticks to wait
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, failure, timeout respectively
- */
-int _task_fifo_get(kfifo_t queue, void *data, int32_t time)
+int task_fifo_get(kfifo_t queue, void *data, int32_t timeout)
 {
 	struct k_args A;
 
 	A.Comm = _K_SVC_FIFO_DEQUE_REQUEST;
-	A.Time.ticks = time;
+	A.Time.ticks = timeout;
 	A.args.q1.data = (char *)data;
 	A.args.q1.queue = queue;
 

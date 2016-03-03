@@ -7,10 +7,10 @@ endif
 endif
 
 ifneq ("$(wildcard $(MDEF_FILE))","")
-MDEF_FILE_PATH=$(MDEF_FILE)
+MDEF_FILE_PATH=$(strip $(MDEF_FILE))
 else
 ifneq ($(MDEF_FILE),)
-MDEF_FILE_PATH=$(PROJECT_BASE)/$(MDEF_FILE)
+MDEF_FILE_PATH=$(strip $(PROJECT_BASE)/$(MDEF_FILE))
 endif
 endif
 
@@ -90,11 +90,11 @@ OFFSETS_INCLUDE = $(strip \
 		-I $(srctree)/kernel/microkernel/include \
 		-I $(srctree)/kernel/nanokernel/include \
 		-I $(srctree)/lib/libc/minimal/include \
-		-I $(srctree)/arch/${SRCARCH}/include )
+		-I $(srctree)/arch/${ARCH}/include )
 
 cmd_cc_o_c_1 = $(CC) $(KBUILD_CFLAGS) $(OFFSETS_INCLUDE) -c -o $@ $<
 
-arch/$(SRCARCH)/core/offsets/offsets.o: arch/$(SRCARCH)/core/offsets/offsets.c
+arch/$(ARCH)/core/offsets/offsets.o: arch/$(ARCH)/core/offsets/offsets.c
 	$(Q)mkdir -p $(dir $@)
 	$(call if_changed,cc_o_c_1)
 
@@ -112,7 +112,7 @@ define offsetchk
 	fi
 endef
 
-include/generated/offsets.h: $(GENOFFSET_H) arch/$(SRCARCH)/core/offsets/offsets.o \
+include/generated/offsets.h: arch/$(ARCH)/core/offsets/offsets.o \
 					include/config/auto.conf FORCE
-	$(call offsetchk,arch/$(SRCARCH)/core/offsets/offsets.o)
+	$(call offsetchk,arch/$(ARCH)/core/offsets/offsets.o)
 

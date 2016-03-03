@@ -1,5 +1,3 @@
-/* irq_manage.c - ARCv2 interrupt management */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,8 +14,10 @@
  * limitations under the License.
  */
 
-/*
- * DESCRIPTION
+/**
+ * @file
+ * @brief ARCv2 interrupt management
+ *
  *
  * Interrupt management:
  *
@@ -26,7 +26,7 @@
  *
  * SW_ISR_TABLE_DYNAMIC has to be enabled for connecting ISRs at runtime.
  *
- * An IRQ number passed to the <irq> parameters found in this file is a
+ * An IRQ number passed to the @a irq parameters found in this file is a
  * number from 16 to last IRQ number on the platform.
  */
 
@@ -37,47 +37,13 @@
 #include <sections.h>
 #include <sw_isr_table.h>
 
-/*
- * @internal
- *
- * @brief Replace an interrupt handler by another
- *
- * An interrupt's ISR can be replaced at runtime. Care must be taken that the
- * interrupt is disabled before doing this.
- *
- * This routine will hang if <old> is not found in the table and ASSERT_ON is
- * enabled.
- *
- * @return N/A
- */
-
-void _irq_handler_set(
-	unsigned int irq,
-	void (*old)(void *arg),
-	void (*new)(void *arg),
-	void *arg
-)
-{
-	int key = irq_lock();
-	int index = irq - 16;
-
-	__ASSERT(old == _sw_isr_table[index].isr,
-		 "expected ISR not found in table");
-
-	if (old == _sw_isr_table[index].isr) {
-		_sw_isr_table[index].isr = new;
-		_sw_isr_table[index].arg = arg;
-	}
-
-	irq_unlock(key);
-}
 
 /*
  * @brief Enable an interrupt line
  *
  * Clear possible pending interrupts on the line, and enable the interrupt
  * line. After this call, the CPU will receive interrupts for the specified
- * <irq>.
+ * @a irq.
  *
  * @return N/A
  */
@@ -94,7 +60,7 @@ void irq_enable(unsigned int irq)
  * @brief Disable an interrupt line
  *
  * Disable an interrupt line. After this call, the CPU will stop receiving
- * interrupts for the specified <irq>.
+ * interrupts for the specified @a irq.
  *
  * @return N/A
  */
@@ -128,7 +94,7 @@ void _irq_priority_set(
 {
 	int key = irq_lock();
 
-	__ASSERT(prio >= 0 && prio < CONFIG_NUM_IRQ_PRIORITIES,
+	__ASSERT(prio >= 0 && prio < CONFIG_NUM_IRQ_PRIO_LEVELS,
 			 "invalid priority!");
 	_arc_v2_irq_unit_prio_set(irq, prio);
 	irq_unlock(key);
@@ -152,27 +118,56 @@ void _irq_spurious(void *unused)
 		;
 }
 
+#if CONFIG_SW_ISR_TABLE_DYNAMIC
+/*
+ * @internal
+ *
+ * @brief Replace an interrupt handler by another
+ *
+ * An interrupt's ISR can be replaced at runtime.
+ *
+ * @return N/A
+ */
+
+void _irq_handler_set(
+	unsigned int irq,
+	void (*new)(void *arg),
+	void *arg
+)
+{
+	int key = irq_lock();
+	int index = irq - 16;
+
+	__ASSERT(irq < CONFIG_NUM_IRQS, "IRQ number too high");
+	_sw_isr_table[index].isr = new;
+	_sw_isr_table[index].arg = arg;
+
+	irq_unlock(key);
+}
+
 /*
  * @brief Connect an ISR to an interrupt line
  *
- * <isr> is connected to interrupt line <irq>, a number greater than or equal
- * 16. No prior ISR can have been connected on <irq> interrupt line since the
+ * @a isr is connected to interrupt line @a irq, a number greater than or equal
+ * 16. No prior ISR can have been connected on @a irq interrupt line since the
  * system booted.
  *
- * This routine will hang if another ISR was connected for interrupt line <irq>
+ * This routine will hang if another ISR was connected for interrupt line @a irq
  * and ASSERT_ON is enabled; if ASSERT_ON is disabled, it will fail silently.
  *
  * @return the interrupt line number
  */
 
-int irq_connect(
+int irq_connect_dynamic(
 	unsigned int irq,
 	unsigned int prio,
 	void (*isr)(void *arg),
-	void *arg
+	void *arg,
+	uint32_t flags
 )
 {
-	_irq_handler_set(irq, _irq_spurious, isr, arg);
+	ARG_UNUSED(flags);
+	_irq_handler_set(irq, isr, arg);
 	_irq_priority_set(irq, prio);
 	return irq;
 }
@@ -182,7 +177,7 @@ int irq_connect(
  *
  * @brief Disconnect an ISR from an interrupt line
  *
- * Interrupt line <irq> is disconnected from its ISR and the latter is
+ * Interrupt line @a irq is disconnected from its ISR and the latter is
  * replaced by _irq_spurious(). irq_disable() should have been called before
  * invoking this routine.
  *
@@ -191,7 +186,7 @@ int irq_connect(
 
 void _irq_disconnect(unsigned int irq)
 {
-	int index = irq - 16;
-
-	_irq_handler_set(irq, _sw_isr_table[index].isr, _irq_spurious, NULL);
+	_irq_handler_set(irq, _irq_spurious, NULL);
 }
+
+#endif /* CONFIG_SW_ISR_TABLE_DYNAMIC */

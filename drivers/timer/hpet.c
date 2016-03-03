@@ -1,5 +1,3 @@
-/* hpet.c - Intel HPET device driver */
-
 /*
  * Copyright (c) 2012-2015 Wind River Systems, Inc.
  *
@@ -16,44 +14,51 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements a kernel device driver for the Intel High Precision
-Event Timer (HPET) device, and provides the standard "system clock driver"
-interfaces.
-
-The driver utilizes HPET timer0 to provide kernel ticks.
-
-\INTERNAL IMPLEMENTATION DETAILS
-The HPET device driver makes no assumption about the initial state of the HPET,
-and explicitly puts the device into a reset-like state. It also assumes that
-the main up counter never wraps around to 0 during the lifetime of the system.
-
-The platform can configure the HPET to use level rather than the default edge
-sensitive interrupts by enabling the following configuration parameters:
-CONFIG_HPET_TIMER_LEVEL_HIGH or CONFIG_HPET_TIMER_LEVEL_LOW
-
-When not configured to support tickless idle timer0 is programmed in periodic
-mode so it automatically generates a single interrupt per kernel tick interval.
-
-When configured to support tickless idle timer0 is programmed in one-shot mode.
-When the CPU is not idling the timer interrupt handler sets the timer to expire
-when the next kernel tick is due, waits for this to occur, and then repeats
-this "ad infinitum". When the CPU begins idling the timer driver reprograms
-the expiry time for the timer (thereby overriding the previously scheduled
-timer interrupt) and waits for the timer to expire or for a non-timer interrupt
-to occur. When the CPU ceases idling the driver determines how many complete
-ticks have elapsed, reprograms the timer so that it expires on the next tick,
-and announces the number of elapsed ticks (if any) to the microkernel.
-
-In a nanokernel-only system this device driver omits more complex capabilities
-(such as tickless idle support) that are only used with a microkernel.
+/**
+ * @file
+ * @brief Intel HPET device driver
+ *
+ * This module implements a kernel device driver for the Intel High Precision
+ * Event Timer (HPET) device, and provides the standard "system clock driver"
+ * interfaces.
+ *
+ * The driver utilizes HPET timer0 to provide kernel ticks.
+ *
+ * \INTERNAL IMPLEMENTATION DETAILS
+ * The HPET device driver makes no assumption about the initial state of the
+ * HPET, and explicitly puts the device into a reset-like state. It also assumes
+ * that the main up counter never wraps around to 0 during the lifetime of the
+ * system.
+ *
+ * The platform can configure the HPET to use level rather than the default edge
+ * sensitive interrupts by enabling the following configuration parameters:
+ * CONFIG_HPET_TIMER_LEVEL_HIGH or CONFIG_HPET_TIMER_LEVEL_LOW
+ *
+ * When not configured to support tickless idle timer0 is programmed in periodic
+ * mode so it automatically generates a single interrupt per kernel tick
+ * interval.
+ *
+ * When configured to support tickless idle timer0 is programmed in one-shot
+ * mode.  When the CPU is not idling the timer interrupt handler sets the timer
+ * to expire when the next kernel tick is due, waits for this to occur, and then
+ * repeats this "ad infinitum". When the CPU begins idling the timer driver
+ * reprograms the expiry time for the timer (thereby overriding the previously
+ * scheduled timer interrupt) and waits for the timer to expire or for a
+ * non-timer interrupt to occur. When the CPU ceases idling the driver
+ * determines how many complete ticks have elapsed, reprograms the timer so that
+ * it expires on the next tick, and announces the number of elapsed ticks (if
+ * any) to the microkernel.
+ *
+ * In a nanokernel-only system this device driver omits more complex
+ * capabilities (such as tickless idle support) that are only used with a
+ * microkernel.
  */
 
 #include <nanokernel.h>
 #include <toolchain.h>
 #include <sections.h>
 #include <sys_clock.h>
+#include <drivers/ioapic.h>
 #include <drivers/system_timer.h>
 
 #ifdef CONFIG_MICROKERNEL
@@ -111,21 +116,21 @@ extern struct nano_stack _k_command_stack;
  */
 
 #define _HPET_GENERAL_INT_STATUS ((volatile uint32_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + GENERAL_INT_STATUS_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + GENERAL_INT_STATUS_REG))
 
 #define _HPET_MAIN_COUNTER_VALUE ((volatile uint64_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG))
 #define _HPET_MAIN_COUNTER_LSW ((volatile uint32_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG))
 #define _HPET_MAIN_COUNTER_MSW ((volatile uint32_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG + 0x4))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + MAIN_COUNTER_VALUE_REG + 0x4))
 
 #define _HPET_TIMER0_CONFIG_CAPS ((volatile uint64_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_CONFIG_CAPS_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_CONFIG_CAPS_REG))
 #define _HPET_TIMER0_COMPARATOR ((volatile uint64_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_COMPARATOR_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_COMPARATOR_REG))
 #define _HPET_TIMER0_FSB_INT_ROUTE ((volatile uint64_t *) \
-			(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_FSB_INT_ROUTE_REG))
+		(CONFIG_HPET_TIMER_BASE_ADDRESS + TIMER0_FSB_INT_ROUTE_REG))
 
 /* general capabilities register macros */
 
@@ -168,15 +173,20 @@ extern struct nano_stack _k_command_stack;
 
 #define HPET_COMP_DELAY 192
 
-IRQ_CONNECT_STATIC(hpet, CONFIG_HPET_TIMER_IRQ, CONFIG_HPET_TIMER_IRQ_PRIORITY,
-		   _timer_int_handler, 0);
-
-#ifdef CONFIG_INT_LATENCY_BENCHMARK
-static uint32_t main_count_first_irq_value = 0;
-static uint32_t main_count_expected_value = 0;
+#if defined(CONFIG_HPET_TIMER_FALLING_EDGE)
+#define HPET_IOAPIC_FLAGS  (IOAPIC_EDGE | IOAPIC_LOW)
+#elif defined(CONFIG_HPET_TIMER_RISING_EDGE)
+#define HPET_IOAPIC_FLAGS  (IOAPIC_EDGE | IOAPIC_HIGH)
+#elif defined(CONFIG_HPET_TIMER_LEVEL_HIGH)
+#define HPET_IOAPIC_FLAGS  (IOAPIC_LEVEL | IOAPIC_HIGH)
+#elif defined(CONFIG_HPET_TIMER_LEVEL_LOW)
+#define HPET_IOAPIC_FLAGS  (IOAPIC_LEVEL | IOAPIC_LOW)
 #endif
 
+
 #ifdef CONFIG_INT_LATENCY_BENCHMARK
+static uint32_t main_count_first_irq_value;
+static uint32_t main_count_expected_value;
 extern uint32_t _hw_irq_to_c_handler_latency;
 #endif
 
@@ -193,14 +203,14 @@ extern uint32_t _hw_irq_to_c_handler_latency;
 
 extern int32_t _sys_idle_elapsed_ticks;
 
-static uint32_t __noinit counter_load_value; /* main counter units
-							    per system tick */
-static uint64_t counter_last_value =
-	0; /* counter value for most recent tick */
-static int32_t programmed_ticks =
-	1; /* # ticks timer is programmed for */
-static int stale_irq_check =
-	0; /* is stale interrupt possible? */
+/* main counter units per system tick */
+static uint32_t __noinit counter_load_value;
+/* counter value for most recent tick */
+static uint64_t counter_last_value;
+/* # ticks timer is programmed for */
+static int32_t programmed_ticks = 1;
+/* is stale interrupt possible? */
+static int stale_irq_check;
 
 /**
  *
@@ -212,10 +222,7 @@ static int stale_irq_check =
  * significant word is being retrieved (as per HPET documentation).
  *
  * @return current 64-bit counter value
- *
- * \NOMANUAL
  */
-
 static uint64_t _hpetMainCounterAtomic(void)
 {
 	uint32_t highBits;
@@ -239,15 +246,12 @@ static uint64_t _hpetMainCounterAtomic(void)
  * is pushed onto the microkernel stack.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 void _timer_int_handler(void *unused)
 {
 	ARG_UNUSED(unused);
 
-#if defined (CONFIG_HPET_TIMER_LEVEL_LOW) || defined (CONFIG_HPET_TIMER_LEVEL_HIGH)
+#if defined(CONFIG_HPET_TIMER_LEVEL_LOW) || defined(CONFIG_HPET_TIMER_LEVEL_HIGH)
 	/* Acknowledge interrupt */
 	*_HPET_GENERAL_INT_STATUS = 1;
 #endif
@@ -389,23 +393,22 @@ void _timer_idle_exit(void)
 		/*
 		 * update # of ticks since last tick event was announced,
 		 * so that this value is available to ISRs that run before the
-		 * timer
-		 * interrupt handler runs (which is unlikely, but could happen)
+		 * timer interrupt handler runs (which is unlikely, but could
+		 * happen)
 		 */
 
 		_sys_idle_elapsed_ticks = programmed_ticks - 1;
 
 		/*
 		 * Announce elapsed ticks to the microkernel. Note we are
-		 * guaranteed
-		 * that the timer ISR will execute first before the tick event
-		 * is
-		 * serviced.
+		 * guaranteed that the timer ISR will execute first before the
+		 * tick event is serviced.
 		 */
 		_sys_clock_tick_announce();
 
 		/* timer interrupt handler reprograms the timer for the next
-		 * tick */
+		 * tick
+		 */
 
 		return;
 	}
@@ -422,9 +425,8 @@ void _timer_idle_exit(void)
 	 * the microkernel, which gets informed of the correct number of elapsed
 	 * ticks when the following tick finally occurs; however, any ISRs that
 	 * access _sys_idle_elapsed_ticks to determine the current time may be
-	 *misled
-	 * during the (very brief) interval before the tick-in-progress finishes
-	 * and the following tick begins
+	 * misled during the (very brief) interval before the tick-in-progress
+	 * finishes and the following tick begins
 	 */
 
 	elapsedTicks =
@@ -458,10 +460,8 @@ void _timer_idle_exit(void)
 
 	/*
 	 * Any elapsed ticks have been accounted for so simply set the
-	 * programmed
-	 * ticks to 1 since the timer has been programmed to fire on the next
-	 * tick
-	 * boundary.
+	 * programmed ticks to 1 since the timer has been programmed to fire on
+	 * the next tick boundary.
 	 */
 
 	programmed_ticks = 1;
@@ -491,8 +491,7 @@ int _sys_clock_driver_init(struct device *device)
 
 	/*
 	 * Initial state of HPET is unknown, so put it back in a reset-like
-	 * state
-	 * (i.e. set main counter to 0 and disable interrupts)
+	 * state (i.e. set main counter to 0 and disable interrupts)
 	 */
 
 	*_HPET_GENERAL_CONFIG &= ~HPET_ENABLE_CNF;
@@ -535,9 +534,11 @@ int _sys_clock_driver_init(struct device *device)
 	PRINTK("HPET: timer0: available interrupts mask 0x%x\n",
 	       (uint32_t)(*_HPET_TIMER0_CONFIG_CAPS >> 32));
 
-	/* Initialize "sys_clock_hw_cycles_per_tick" */
+	/* Initialize sys_clock_hw_cycles_per_tick/sec */
 
 	sys_clock_hw_cycles_per_tick = counter_load_value;
+	sys_clock_hw_cycles_per_sec = sys_clock_hw_cycles_per_tick *
+									sys_clock_ticks_per_sec;
 
 
 #ifdef CONFIG_INT_LATENCY_BENCHMARK
@@ -575,7 +576,7 @@ int _sys_clock_driver_init(struct device *device)
 	 */
 	*_HPET_TIMER0_CONFIG_CAPS |= HPET_Tn_VAL_SET_CNF;
 	*_HPET_TIMER0_COMPARATOR = counter_load_value;
-        /*
+	/*
 	 * After the comparator is loaded, 32-bit mode can be safely
 	 * switched off
 	 */
@@ -588,9 +589,9 @@ int _sys_clock_driver_init(struct device *device)
 	 */
 
 	/*
-	 * HPET timers IRQ field is 5 bits wide, and hence, can support only IRQ's
-	 * up to 31. Some platforms, however, use IRQs greater than 31. In this
-	 * case program leaves the IRQ fields blank.
+	 * HPET timers IRQ field is 5 bits wide, and hence, can support only
+	 * IRQ's up to 31. Some platforms, however, use IRQs greater than 31. In
+	 * this case program leaves the IRQ fields blank.
 	 */
 
 	*_HPET_TIMER0_CONFIG_CAPS =
@@ -601,7 +602,7 @@ int _sys_clock_driver_init(struct device *device)
 		(*_HPET_TIMER0_CONFIG_CAPS & ~HPET_Tn_INT_ROUTE_CNF_MASK)
 #endif
 
-#if defined (CONFIG_HPET_TIMER_LEVEL_LOW) || defined (CONFIG_HPET_TIMER_LEVEL_HIGH)
+#if defined(CONFIG_HPET_TIMER_LEVEL_LOW) || defined(CONFIG_HPET_TIMER_LEVEL_HIGH)
 		| HPET_Tn_INT_TYPE_CNF;
 #else
 		;
@@ -609,11 +610,10 @@ int _sys_clock_driver_init(struct device *device)
 
 	/*
 	 * Although the stub has already been "connected", the vector number
-	 * still
-	 * has to be programmed into the interrupt controller.
+	 * still has to be programmed into the interrupt controller.
 	 */
-
-	IRQ_CONFIG(hpet, CONFIG_HPET_TIMER_IRQ);
+	IRQ_CONNECT(CONFIG_HPET_TIMER_IRQ, CONFIG_HPET_TIMER_IRQ_PRIORITY,
+		   _timer_int_handler, 0, HPET_IOAPIC_FLAGS);
 
 	/* enable the IRQ in the interrupt controller */
 
@@ -641,13 +641,10 @@ int _sys_clock_driver_init(struct device *device)
  * it will need to call _hpetMainCounterAtomic().
  */
 
-uint32_t _sys_clock_cycle_get(void)
+uint32_t sys_cycle_get_32(void)
 {
 	return (uint32_t) *_HPET_MAIN_COUNTER_VALUE;
 }
-
-FUNC_ALIAS(_sys_clock_cycle_get, nano_cycle_get_32, uint32_t);
-FUNC_ALIAS(_sys_clock_cycle_get, task_cycle_get_32, uint32_t);
 
 #ifdef CONFIG_SYSTEM_CLOCK_DISABLE
 

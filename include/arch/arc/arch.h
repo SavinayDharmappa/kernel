@@ -1,5 +1,3 @@
-/* arch.h - ARC specific nanokernel interface header */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This header contains the ARC specific nanokernel interface.  It is
-included by the nanokernel interface architecture-abstraction header
-(nanokernel/cpu.h)
+/**
+ * @file
+ * @brief ARC specific nanokernel interface header
+ *
+ * This header contains the ARC specific nanokernel interface.  It is
+ * included by the nanokernel interface architecture-abstraction header
+ * (nanokernel/cpu.h)
  */
 
 #ifndef _ARC_ARCH__H_
@@ -35,6 +35,7 @@ extern "C" {
 #define OCTET_TO_SIZEOFUNIT(X) (X)
 #define SIZEOFUNIT_TO_OCTET(X) (X)
 
+#include <sw_isr_table.h>
 #ifdef CONFIG_CPU_ARCV2
 #include <arch/arc/v2/exc.h>
 #include <arch/arc/v2/irq.h>
@@ -44,6 +45,7 @@ extern "C" {
 #include <arch/arc/v2/aux_regs.h>
 #include <arch/arc/v2/arcv2_irq_unit.h>
 #include <arch/arc/v2/asm_inline.h>
+#include <arch/arc/v2/addr_types.h>
 #endif
 
 #define STACK_ALIGN  4
@@ -52,44 +54,51 @@ extern "C" {
 }
 #endif
 
+#ifndef _ASMLANGUAGE
+
+/* internal routine documented in C file, needed by IRQ_CONNECT() macro */
+extern void _irq_priority_set(unsigned int irq, unsigned int prio);
 
 /**
- * @brief Connect a routine to interrupt number
+ * Configure a static interrupt.
  *
- * For the device @a device associates IRQ number @a irq with priority
- * @a priority with the interrupt routine @a isr, that receives parameter
- * @a parameter.
- * IRQ connect static is currently not supported in ARC architecture.
- * The macro is defined as empty for code compatibility with other
- * architectures.
+ * All arguments must be computable by the compiler at build time; if this
+ * can't be done use irq_connect_dynamic() instead.
  *
- * @param device Device
- * @param irq IRQ number
- * @param priority IRQ Priority
- * @param isr Interrupt Service Routine
- * @param parameter ISR parameter
+ * Internally this function does a few things:
  *
- * @return N/A
+ * 1. The enum statement has no effect but forces the compiler to only
+ * accept constant values for the irq_p parameter, very important as the
+ * numerical IRQ line is used to create a named section.
  *
+ * 2. An instance of _IsrTableEntry is created containing the ISR and its
+ * parameter. If you look at how _sw_isr_table is created, each entry in the
+ * array is in its own section named by the IRQ line number. What we are doing
+ * here is to override one of the default entries (which points to the
+ * spurious IRQ handler) with what was supplied here.
+ *
+ * 3. The priority level for the interrupt is configured by a call to
+ * _irq_priority_set()
+ *
+ * @param irq_p IRQ line number
+ * @param priority_p Interrupt priority
+ * @param isr_p Interrupt service routine
+ * @param isr_param_p ISR parameter
+ * @param flags_p IRQ triggering options (currently unused)
+ *
+ * @return The vector assigned to this interrupt
  */
-#define IRQ_CONNECT_STATIC(device, irq, priority, isr, parameter)
+#define IRQ_CONNECT(irq_p, priority_p, isr_p, isr_param_p, flags_p) \
+({ \
+	enum { IRQ = irq_p }; \
+	static struct _IsrTableEntry _CONCAT(_isr_irq, irq_p) \
+		__attribute__ ((used))  \
+		__attribute__ ((section(STRINGIFY(_CONCAT(.gnu.linkonce.isr_irq, irq_p))))) = \
+			{isr_param_p, isr_p}; \
+	_irq_priority_set(irq_p, priority_p); \
+	irq_p; \
+})
 
-/**
- *
- * @brief Configure interrupt for the device
- *
- * For the selected device, do the neccessary configuration
- * steps to connect and enable the IRQ line with an ISR
- * at the priority requested.
- * @param isr Pointer to the interruption service routine
- * @param irq IRQ number
- * @param priority Priority for the interruption
- *
- * @return N/A
- *
- */
-#define IRQ_CONFIG(isr, irq, priority) \
-		irq_connect(irq, priority, isr, NULL); \
-		irq_enable(irq);
+#endif
 
 #endif /* _ARC_ARCH__H_ */

@@ -27,8 +27,7 @@
  * The task level device driver tests/waits on this event number to determine
  * if/when the interrupt has occurred. As the ISR also disables the interrupt, the
  * task level device driver subsequently make a request to have the interrupt
- * enabled again. If desired, the device driver can free an IRQ object that
- * it is no longer interested in using.
+ * enabled again.
  *
  * These routines perform error checking to ensure that an IRQ object can only be
  * allocated by a single task, and that subsequent operations on that IRQ object
@@ -71,23 +70,8 @@ static struct task_irq_info task_irq_object[MAX_TASK_IRQS] = {
 	[0 ...(MAX_TASK_IRQS - 1)].task_id = INVALID_TASK
 };
 
-/* architecture-specific */
-
-#if defined(CONFIG_X86_32)
-
-#define RELEASE_VECTOR(v) _IntVecMarkFree(v)
-
-#elif defined(CONFIG_CPU_CORTEX_M3_M4)
-#include <arch/cpu.h>
-extern void _irq_disconnect(unsigned int irq);
-#define RELEASE_VECTOR(v) _irq_disconnect(v)
-#else
-#error "Unknown target"
-#endif
-
-/* event id used by first task IRQ object */
-
-extern const kevent_t _TaskIrqEvt0_objId;
+/* array of event id used by task IRQ objects */
+extern const kevent_t _TaskIrqEvt_objIds[];
 
 /**
  *
@@ -116,24 +100,13 @@ static void task_irq_int_handler(void *parameter)
 	irq_disable(irq_obj_ptr->irq);
 }
 
-void task_irq_free(kirq_t irq_obj)
-{
-	__ASSERT(irq_obj < MAX_TASK_IRQS, "Invalid IRQ object");
-	__ASSERT(task_irq_object[irq_obj].task_id == task_id_get(),
-			 "Incorrect Task ID");
-
-	irq_disable(task_irq_object[irq_obj].irq);
-	RELEASE_VECTOR(task_irq_object[irq_obj].vector);
-	(void)task_event_recv(task_irq_object[irq_obj].event);
-	task_irq_object[irq_obj].task_id = INVALID_TASK;
-}
-
 /**
  *
  * @brief Re-enable a task IRQ object's interrupt
  *
  * This re-enables the interrupt for a task IRQ object.
  * @param irq_obj IRQ object identifier
+ *
  * @return N/A
  */
 void task_irq_ack(kirq_t irq_obj)
@@ -145,22 +118,13 @@ void task_irq_ack(kirq_t irq_obj)
 	irq_enable(task_irq_object[irq_obj].irq);
 }
 
-/**
- *
- * @brief Determine if a task IRQ object has had an interrupt
- *
- * This tests a task IRQ object to see if it has signaled an interrupt.
- * @param irq_obj IRQ object identifier
- * @param time  Time to wait (in ticks)
- * @return RC_OK, RC_FAIL, or RC_TIME
- */
-int _task_irq_test(kirq_t irq_obj, int32_t time)
+int task_irq_wait(kirq_t irq_obj, int32_t timeout)
 {
 	__ASSERT(irq_obj < MAX_TASK_IRQS, "Invalid IRQ object");
 	__ASSERT(task_irq_object[irq_obj].task_id == task_id_get(),
 			 "Incorrect Task ID");
 
-	return _task_event_recv(task_irq_object[irq_obj].event, time);
+	return task_event_recv(task_irq_object[irq_obj].event, timeout);
 }
 
 /**
@@ -169,6 +133,7 @@ int _task_irq_test(kirq_t irq_obj, int32_t time)
  *
  * This routine allocates a task IRQ object to a task.
  * @param arg Pointer to registration request arguments
+ *
  * @return ptr to allocated task IRQ object if successful, NULL if not
  */
 static int _k_task_irq_alloc(void *arg)
@@ -197,14 +162,15 @@ static int _k_task_irq_alloc(void *arg)
 	irq_obj_ptr = &task_irq_object[argp->irq_obj];
 	irq_obj_ptr->task_id = argp->task_id;
 	irq_obj_ptr->irq = argp->irq;
-	irq_obj_ptr->event = (_TaskIrqEvt0_objId + argp->irq_obj);
+	irq_obj_ptr->event = _TaskIrqEvt_objIds[argp->irq_obj];
 	irq_obj_ptr->vector = INVALID_VECTOR;
 
 	return (int)irq_obj_ptr;
 }
 
 
-uint32_t task_irq_alloc(kirq_t irq_obj,	uint32_t irq, uint32_t priority)
+uint32_t task_irq_alloc(kirq_t irq_obj,	uint32_t irq, uint32_t priority,
+			uint32_t flags)
 {
 	struct irq_obj_reg_arg arg;  /* IRQ object registration request arguments */
 	struct task_irq_info *irq_obj_ptr; /* ptr to task IRQ object */
@@ -221,12 +187,9 @@ uint32_t task_irq_alloc(kirq_t irq_obj,	uint32_t irq, uint32_t priority)
 		return INVALID_VECTOR;
 	}
 
-	/*
-	 * NOTE: the comma that seems to be missing is part of the IRQ_STUB
-	 *       definition to abstract the different irq_connect signatures
-	 */
-	irq_obj_ptr->vector = irq_connect(
-		irq, priority, task_irq_int_handler, (void *)irq_obj_ptr);
+	irq_obj_ptr->vector = irq_connect_dynamic(
+		irq, priority, task_irq_int_handler, (void *)irq_obj_ptr,
+		flags);
 	irq_enable(irq);
 
 	return irq_obj_ptr->vector;

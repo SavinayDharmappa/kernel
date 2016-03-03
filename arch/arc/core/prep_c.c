@@ -1,5 +1,3 @@
-/* prep_c.c - full C support initialization */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,14 +14,16 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Initialization of full C support: zero the .bss, copy the .data if XIP,
-call _Cstart().
-
-Stack is available in this module, but not the global data/bss until their
-initialization is performed.
+/**
+ * @file
+ * @brief Full C support initialization
+ *
+ *
+ * Initialization of full C support: zero the .bss, copy the .data if XIP,
+ * call _Cstart().
+ *
+ * Stack is available in this module, but not the global data/bss until their
+ * initialization is performed.
  */
 
 #include <stdint.h>

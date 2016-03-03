@@ -1,5 +1,3 @@
-/* architecture-independent private nanokernel APIs */
-
 /*
  * Copyright (c) 2010-2012, 2014-2015 Wind River Systems, Inc.
  *
@@ -16,9 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This file contains private nanokernel APIs that are not architecture-specific.
+/**
+ * @file
+ * @brief Architecture-independent private nanokernel APIs
+ *
+ * This file contains private nanokernel APIs that are not
+ * architecture-specific.
  */
 
 #ifndef _NANO_INTERNAL__H_
@@ -53,7 +54,7 @@ extern void _new_thread(char *pStack, unsigned stackSize,
 
 /* context switching and scheduling-related routines */
 
-extern void _nano_fiber_schedule(struct tcs *tcs);
+extern void _nano_fiber_ready(struct tcs *tcs);
 extern void _nano_fiber_swap(void);
 
 extern unsigned int _Swap(unsigned int);

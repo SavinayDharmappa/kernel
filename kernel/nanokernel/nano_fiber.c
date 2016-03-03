@@ -41,7 +41,7 @@
  *
  * @return N/A
  */
-void _nano_fiber_schedule(struct tcs *tcs)
+void _nano_fiber_ready(struct tcs *tcs)
 {
 	struct tcs *pQ = (struct tcs *)&_nanokernel.fiber;
 
@@ -88,8 +88,10 @@ void _fiber_start(char *pStack,
 			priority,
 			options);
 
-	/* _new_thread() has already set the flags depending on the 'options'
-	 * and 'priority' parameters passed to it */
+	/*
+	 * _new_thread() has already set the flags depending on the 'options'
+	 * and 'priority' parameters passed to it
+	 */
 
 	/* lock interrupts to prevent corruption of the runnable fiber list */
 
@@ -97,7 +99,7 @@ void _fiber_start(char *pStack,
 
 	/* make the newly crafted TCS a runnable fiber */
 
-	_nano_fiber_schedule(tcs);
+	_nano_fiber_ready(tcs);
 
 	/*
 	 * Simply return to the caller if the current thread is FIBER,
@@ -123,7 +125,7 @@ void fiber_yield(void)
 		 * then swap to the thread at the head of the fiber list.
 		 */
 
-		_nano_fiber_schedule(_nanokernel.current);
+		_nano_fiber_ready(_nanokernel.current);
 		_Swap(imask);
 	} else {
 		irq_unlock(imask);
@@ -177,34 +179,20 @@ FUNC_NORETURN void fiber_abort(void)
 
 #include <wait_q.h>
 
-void fiber_sleep(int32_t timeout_in_ticks)
-{
-	int key;
-
-	if (TICKS_NONE == timeout_in_ticks) {
-		fiber_yield();
-		return;
-	}
-
-	key = irq_lock();
-	_nano_timeout_add(_nanokernel.current, NULL, timeout_in_ticks);
-	_Swap(key);
-}
-
 FUNC_ALIAS(fiber_delayed_start, fiber_fiber_delayed_start, void *);
 FUNC_ALIAS(fiber_delayed_start, task_fiber_delayed_start, void *);
 
 void *fiber_delayed_start(char *stack, unsigned int stack_size_in_bytes,
-							nano_fiber_entry_t entry_point, int param1,
-							int param2, unsigned int priority,
-							unsigned int options, int32_t timeout_in_ticks)
+			  nano_fiber_entry_t entry_point, int param1,
+			  int param2, unsigned int priority,
+			  unsigned int options, int32_t timeout_in_ticks)
 {
 	unsigned int key;
 	struct tcs *tcs;
 
 	tcs = (struct tcs *)stack;
 	_new_thread(stack, stack_size_in_bytes, (_thread_entry_t)entry_point,
-				(void *)param1, (void *)param2, (void *)0, priority, options);
+		(void *)param1, (void *)param2, (void *)0, priority, options);
 
 	key = irq_lock();
 

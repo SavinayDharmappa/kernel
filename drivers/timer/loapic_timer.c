@@ -128,20 +128,16 @@
 extern int32_t _sys_idle_elapsed_ticks;
 #endif /* TIMER_SUPPORTS_TICKLESS */
 
-IRQ_CONNECT_STATIC(loapic, CONFIG_LOAPIC_TIMER_IRQ,
-			CONFIG_LOAPIC_TIMER_IRQ_PRIORITY,
-			_timer_int_handler, 0);
-
-static uint32_t __noinit cycles_per_tick; /* computed counter 0
-							  initial count value */
-static uint32_t accumulated_cycle_count = 0;
+/* computed counter 0 initial count value */
+static uint32_t __noinit cycles_per_tick;
+static uint32_t accumulated_cycle_count;
 
 #if defined(TIMER_SUPPORTS_TICKLESS)
-static uint32_t programmed_cycles = 0;
-static uint32_t programmed_full_ticks = 0;
+static uint32_t programmed_cycles;
+static uint32_t programmed_full_ticks;
 static uint32_t __noinit max_system_ticks;
 static uint32_t __noinit cycles_per_max_ticks;
-static bool timer_known_to_have_expired = false;
+static bool timer_known_to_have_expired;
 static unsigned char timer_mode = TIMER_MODE_PERIODIC;
 #endif /* TIMER_SUPPORTS_TICKLESS */
 
@@ -158,10 +154,7 @@ extern struct nano_stack _k_command_stack;
  * This routine sets the timer for periodic mode.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void periodic_mode_set(void)
 {
 	*_REG_TIMER |= LOAPIC_TIMER_PERIODIC;
@@ -177,10 +170,7 @@ static inline void periodic_mode_set(void)
  * This routine disables the LOAPIC timer by masking it.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void timer_interrupt_mask(void)
 {
 	*_REG_TIMER |= LOAPIC_LVT_MASKED;
@@ -196,10 +186,7 @@ static inline void timer_interrupt_mask(void)
  * This routine enables the LOAPIC timer by unmasking it.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void timer_interrupt_unmask(void)
 {
 	*_REG_TIMER &= ~LOAPIC_LVT_MASKED;
@@ -214,10 +201,7 @@ static inline void timer_interrupt_unmask(void)
  * Note that setting the value to zero stops the timer.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void initial_count_register_set(
 	uint32_t count /* count from which timer is to count down */
 	)
@@ -233,10 +217,7 @@ static inline void initial_count_register_set(
  * This routine sets the timer for one shot mode.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static inline void one_shot_mode_set(void)
 {
 	*_REG_TIMER &= ~LOAPIC_TIMER_PERIODIC;
@@ -251,14 +232,17 @@ static inline void one_shot_mode_set(void)
  * external bus frequency.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
+#if defined(CONFIG_LOAPIC_TIMER_DIVIDER_UNSUPPORTED)
+static inline void divide_configuration_register_set(void)
+{
+}
+#else
 static inline void divide_configuration_register_set(void)
 {
 	*_REG_TIMER_CFG = (*_REG_TIMER_CFG & ~0xf) | LOAPIC_TIMER_DIVBY_1;
 }
+#endif
 
 /**
  *
@@ -269,8 +253,6 @@ static inline void divide_configuration_register_set(void)
  * interrupt.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
 static inline uint32_t current_count_register_get(void)
 {
@@ -285,8 +267,6 @@ static inline uint32_t current_count_register_get(void)
  * This routine gets the value from the initial count register.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
 static inline uint32_t initial_count_register_get(void)
 {
@@ -303,7 +283,6 @@ static inline uint32_t initial_count_register_get(void)
  *
  * @return N/A
  */
-
 void _timer_int_handler(void *unused /* parameter is not used */
 				 )
 {
@@ -399,10 +378,7 @@ void _timer_int_handler(void *unused /* parameter is not used */
  * "tickless idle".
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static void tickless_idle_init(void)
 {
 	/*
@@ -426,7 +402,6 @@ static void tickless_idle_init(void)
  *
  * @return N/A
  */
-
 void _timer_idle_enter(int32_t ticks /* system ticks */
 				)
 {
@@ -482,7 +457,6 @@ void _timer_idle_enter(int32_t ticks /* system ticks */
  *
  * @return N/A
  */
-
 void _timer_idle_exit(void)
 {
 	uint32_t remaining_cycles;
@@ -578,7 +552,6 @@ void _timer_idle_exit(void)
  *
  * @return 0
  */
-
 int _sys_clock_driver_init(struct device *device)
 {
 	ARG_UNUSED(device);
@@ -594,15 +567,12 @@ int _sys_clock_driver_init(struct device *device)
 	initial_count_register_set(cycles_per_tick - 1);
 	periodic_mode_set();
 
-	/*
-	 * Although the stub has already been "connected", the vector number
-	 * still
-	 * has to be programmed into the interrupt controller.
-	 */
-	IRQ_CONFIG(loapic, CONFIG_LOAPIC_TIMER_IRQ);
+	IRQ_CONNECT(CONFIG_LOAPIC_TIMER_IRQ, CONFIG_LOAPIC_TIMER_IRQ_PRIORITY,
+		    _timer_int_handler, 0, 0);
 
 	/* Everything has been configured. It is now safe to enable the
-	 * interrupt */
+	 * interrupt
+	 */
 	irq_enable(CONFIG_LOAPIC_TIMER_IRQ);
 
 	return 0;
@@ -617,8 +587,7 @@ int _sys_clock_driver_init(struct device *device)
  *
  * @return up counter of elapsed clock cycles
  */
-
-uint32_t _sys_clock_cycle_get(void)
+uint32_t sys_cycle_get_32(void)
 {
 	uint32_t val; /* system clock value */
 
@@ -642,9 +611,6 @@ uint32_t _sys_clock_cycle_get(void)
 	return val;
 }
 
-FUNC_ALIAS(_sys_clock_cycle_get, nano_cycle_get_32, uint32_t);
-FUNC_ALIAS(_sys_clock_cycle_get, task_cycle_get_32, uint32_t);
-
 #if defined(CONFIG_SYSTEM_CLOCK_DISABLE)
 /**
  *
@@ -655,7 +621,6 @@ FUNC_ALIAS(_sys_clock_cycle_get, task_cycle_get_32, uint32_t);
  *
  * @return N/A
  */
-
 void sys_clock_disable(void)
 {
 	unsigned int key; /* interrupt lock level */

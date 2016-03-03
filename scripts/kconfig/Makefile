@@ -98,13 +98,15 @@ ifeq ($(KBUILD_DEFCONFIG),)
 	$< --defconfig $(Kconfig)
 else
 	@echo "*** Default configuration is based on '$(KBUILD_DEFCONFIG)'"
-	$(Q)$< --defconfig=arch/$(SRCARCH)/configs/$(KBUILD_DEFCONFIG) $(Kconfig)
+	$(Q)$< --defconfig=configs/$(KBUILD_DEFCONFIG) $(Kconfig)
 endif
+defconfigfiles=$(wildcard $(srctree)/boards/*/$@)
 
 %_defconfig: $(obj)/conf
-	$(Q)$< --defconfig=arch/$(SRCARCH)/configs/$@ $(Kconfig)
+	$(if $(call defconfigfiles),, $(error No configuration exists for this board))
+	$(Q)$< --defconfig=$(defconfigfiles) $(Kconfig)
 
-configfiles=$(wildcard $(PROJECT_BASE)/$@ $(srctree)/kernel/configs/$@ $(srctree)/arch/$(SRCARCH)/configs/$@)
+configfiles=$(wildcard $(PROJECT_BASE)/$@ $(srctree)/kernel/configs/$@ $(srctree)/configs/$@)
 
 %.config: $(obj)/conf
 	$(if $(call configfiles),, $(error No configuration exists for this target on this architecture))
@@ -184,7 +186,7 @@ $(obj)/dochecklxdialog:
 always := dochecklxdialog
 
 # Add environment specific flags
-HOST_EXTRACFLAGS += $(shell $(CONFIG_SHELL) $(srctree)/$(src)/check.sh $(HOSTCC) $(HOSTCFLAGS))
+HOST_EXTRACFLAGS += -Wno-format-security -DKBUILD_NO_NLS
 
 # generated files seem to need this to find local include files
 HOSTCFLAGS_zconf.lex.o	:= -I$(src)
@@ -303,3 +305,29 @@ $(obj)/%.moc: $(src)/%.h $(obj)/.tmp_qtcheck
 $(obj)/gconf.glade.h: $(obj)/gconf.glade
 	$(Q)intltool-extract --type=gettext/glade --srcdir=$(srctree) \
 	$(obj)/gconf.glade
+
+ifdef LKC_GENPARSER
+
+# --- UNUSED, ignore ----------------------------------------------------------
+$(obj)/zconf.tab.c: $(src)/zconf.y
+$(obj)/zconf.lex.c: $(src)/zconf.l
+$(obj)/zconf.hash.c: $(src)/zconf.gperf
+
+%.tab.c: %.y
+	bison -t -l -b $* -p $(notdir $*) $<
+
+%.tab.c_shipped: %.tab.c
+	cp $< $@
+
+%.lex.c: %.l
+	flex -L -P$(notdir $*) -o$@ $<
+
+%.lex.c_shipped: %.lex.c
+	cp $< $@
+
+%.hash.c: %.gperf
+	gperf < $< > $@
+	cp $@ $@_shipped
+# --- UNUSED, ignore ----------------------------------------------------------
+
+endif

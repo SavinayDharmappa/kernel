@@ -1,0 +1,5 @@
+
+config  BOARD_ARDUINO_101
+        bool "Arduino 101 Board"
+        select SOC_QUARK_SE
+	depends on X86

@@ -1,5 +1,3 @@
-/* nano_private.h - private nanokernel definitions (ARM) */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,15 +14,17 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This file contains private nanokernel structures definitions and various other
-definitions for the ARM Cortex-M3 processor architecture.
-
-This file is also included by assembly language files which must #define
-_ASMLANGUAGE before including this header file.  Note that nanokernel assembly
-source files obtains structure offset values via "absolute symbols" in the
-offsets.o module.
+/**
+ * @file
+ * @brief Private nanokernel definitions (ARM)
+ *
+ * This file contains private nanokernel structures definitions and various
+ * other definitions for the ARM Cortex-M3 processor architecture.
+ *
+ * This file is also included by assembly language files which must #define
+ * _ASMLANGUAGE before including this header file.  Note that nanokernel
+ * assembly source files obtains structure offset values via "absolute symbols"
+ * in the offsets.o module.
  */
 
 #ifndef _NANO_PRIVATE_H
@@ -125,6 +125,9 @@ struct tcs {
 #ifdef CONFIG_NANO_TIMEOUTS
 	struct _nano_timeout nano_timeout;
 #endif
+#ifdef CONFIG_ERRNO
+	int errno_var;
+#endif
 };
 
 struct s_NANO {
@@ -147,10 +150,7 @@ struct s_NANO {
 
 #ifdef CONFIG_NANO_TIMEOUTS
 	sys_dlist_t timeout_q;
-#endif
-
-#if defined(CONFIG_ARM_DEBUG_ESF)
-	NANO_ISF *isf; /* latest ISF in a nested chain */
+	int32_t task_timeout;
 #endif
 };
 
@@ -169,10 +169,6 @@ static ALWAYS_INLINE void nanoArchInit(void)
 	_ExcSetup();
 	_FaultInit();
 	_CpuIdleInit();
-#if defined(CONFIG_ARM_DEBUG_ESF)
-	/* to prevent problems when returning the stack pointer in ISF */
-	__scs.scb.ccr.bit.stkalign = 0;
-#endif
 }
 
 /**
@@ -183,15 +179,13 @@ static ALWAYS_INLINE void nanoArchInit(void)
  * to <value>.  It is assumed that the specified <fiber> is pending, and thus
  * the fiber's thread is stored in its struct tcs structure.
  *
- * @return N/A
+ * @param fiber pointer to the fiber
+ * @param value is the value to set as a return value
  *
- * \NOMANUAL
+ * @return N/A
  */
-
-static ALWAYS_INLINE void fiberRtnValueSet(
-	struct tcs *fiber,       /* pointer to fiber */
-	unsigned int value /* value to set as return value */
-	)
+static ALWAYS_INLINE void fiberRtnValueSet(struct tcs *fiber,
+					   unsigned int value)
 {
 	tESF *pEsf = (void *)fiber->preempReg.psp;
 

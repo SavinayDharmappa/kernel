@@ -1,5 +1,3 @@
-/* memory_map.h - ARM CORTEX-M memory map */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module contains definitions for the memory map of the CORTEX-M series of
-processors.
-
+/**
+ * @file
+ * @brief ARM CORTEX-M memory map
+ *
+ * This module contains definitions for the memory map of the CORTEX-M series of
+ * processors.
  */
 
 #ifndef _CORTEXM_MEMORY_MAP__H_

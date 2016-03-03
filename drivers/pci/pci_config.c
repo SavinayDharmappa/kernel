@@ -1,5 +1,3 @@
-/* pci_config.c - PCI bus support */
-
 /*
  * Copyright (c) 2009-2010, 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-This module implements the PCI config space access functions
-
+/**
+ * @file
+ * @brief PCI bus support
+ *
+ *
+ * This module implements the PCI config space access functions
+ *
  */
 
 #include <nanokernel.h>

@@ -1,8 +1,8 @@
 /** @file
- @brief Simple socket API
-
- Simple socket API for applications to connection establishment and
- disconnection.
+ * @brief Simple socket API
+ *
+ * Simple socket API for applications to connection establishment and
+ * disconnection.
  */
 
 /*
@@ -26,7 +26,11 @@
 
 #include <stdint.h>
 #include <net/net_ip.h>
-#include <net/net_buf.h>
+#include <net/buf.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @brief Get network context.
@@ -121,5 +125,9 @@ struct net_buf *net_receive(struct net_context *context,
  */
 struct simple_udp_connection *
 	net_context_get_udp_connection(struct net_context *context);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NET_SOCKET_H */

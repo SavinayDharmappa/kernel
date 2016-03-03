@@ -1,5 +1,3 @@
-/* nanokernel initialization module */
-
 /*
  * Copyright (c) 2010-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module contains routines that are used to initialize the nanokernel.
+/**
+ * @file
+ * @brief Nanokernel initialization module
+ *
+ * This module contains routines that are used to initialize the nanokernel.
  */
 
 #include <offsets.h>
@@ -80,17 +80,14 @@ char __noinit __stack main_task_stack[CONFIG_MAIN_STACK_SIZE];
  * nanokernel context switches to the background (or idle) task.
  */
 
-#ifndef CONFIG_NO_ISRS
 char __noinit _interrupt_stack[CONFIG_ISR_STACK_SIZE];
-#endif
-
-/* constructor initialization */
-
-extern void _Ctors(void);
 
 #ifdef CONFIG_NANO_TIMEOUTS
 	#include <misc/dlist.h>
-	#define initialize_nano_timeouts() sys_dlist_init(&_nanokernel.timeout_q)
+	#define initialize_nano_timeouts() do { \
+		sys_dlist_init(&_nanokernel.timeout_q); \
+		_nanokernel.task_timeout = TICKS_UNLIMITED; \
+	} while ((0))
 #else
 	#define initialize_nano_timeouts() do { } while ((0))
 #endif
@@ -105,13 +102,19 @@ extern void _Ctors(void);
  *
  * @return N/A
  */
-
 static void _main(void)
 {
-	_sys_device_do_config_level(NANO_EARLY);
-	_sys_device_do_config_level(NANO_LATE);
-	_sys_device_do_config_level(APP_EARLY);
-	_sys_device_do_config_level(APP_EARLY);
+	_sys_device_do_config_level(_SYS_INIT_LEVEL_SECONDARY);
+	_sys_device_do_config_level(_SYS_INIT_LEVEL_NANOKERNEL);
+	_sys_device_do_config_level(_SYS_INIT_LEVEL_APPLICATION);
+
+#ifdef CONFIG_CPLUSPLUS
+	/* Process the .ctors and .init_array sections */
+	extern void __do_global_ctors_aux(void);
+	extern void __do_init_array_aux(void);
+	__do_global_ctors_aux();
+	__do_init_array_aux();
+#endif
 
 	extern void main(void);
 	main();
@@ -134,7 +137,6 @@ extern void _main(void);
  *
  * @return N/A
  */
-
 static void nano_init(struct tcs *dummyOutContext)
 {
 	/*
@@ -156,7 +158,6 @@ static void nano_init(struct tcs *dummyOutContext)
 	dummyOutContext->prio = 0;
 
 
-#ifndef CONFIG_NO_ISRS
 	/*
 	 * The interrupt library needs to be initialized early since a series of
 	 * handlers are installed into the interrupt table to catch spurious
@@ -166,7 +167,6 @@ static void nano_init(struct tcs *dummyOutContext)
 	 */
 
 	_IntLibInit();
-#endif
 
 	/*
 	 * Initialize the thread control block (TCS) for the main task (either
@@ -211,13 +211,13 @@ static void nano_init(struct tcs *dummyOutContext)
 
 extern void *__stack_chk_guard;
 
-#if defined(CONFIG_X86_32)
+#if defined(CONFIG_X86)
 #define _MOVE_INSTR "movl "
 #elif defined(CONFIG_ARM)
 #define _MOVE_INSTR "str "
 #else
 #error "Unknown Architecture type"
-#endif /* CONFIG_X86_32 */
+#endif /* CONFIG_X86 */
 
 #define STACK_CANARY_INIT()                                \
 	do {                                               \
@@ -242,7 +242,6 @@ extern void *__stack_chk_guard;
  *
  * @return Does not return
  */
-
 FUNC_NORETURN void _Cstart(void)
 {
 	/* floating point operations are NOT performed during nanokernel init */
@@ -259,9 +258,7 @@ FUNC_NORETURN void _Cstart(void)
 
 	/* perform basic hardware initialization */
 
-	_sys_device_do_config_level(PRE_KERNEL_CORE);
-	_sys_device_do_config_level(PRE_KERNEL_EARLY);
-	_sys_device_do_config_level(PRE_KERNEL_LATE);
+	_sys_device_do_config_level(_SYS_INIT_LEVEL_PRIMARY);
 
 	/*
 	 * Initialize random number generator
@@ -275,10 +272,6 @@ FUNC_NORETURN void _Cstart(void)
 	/* initialize stack canaries */
 
 	STACK_CANARY_INIT();
-
-	/* invoke C++ constructors */
-
-	_Ctors();
 
 	/* display boot banner */
 

@@ -1,5 +1,3 @@
-/* stack.h - stack helpers for Cortex-M CPUs */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Stack helper functions.
+/**
+ * @file
+ * @brief Stack helpers for Cortex-M CPUs
+ *
+ * Stack helper functions.
  */
 
 #ifndef _ARM_CORTEXM_STACK__H_
@@ -26,6 +26,10 @@ Stack helper functions.
 
 #include <nano_private.h>
 #include <asm_inline.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef CONFIG_STACK_ALIGN_DOUBLE_WORD
 #define STACK_ALIGN_SIZE 8
@@ -52,10 +56,7 @@ extern char _interrupt_stack[CONFIG_ISR_STACK_SIZE];
  * pointer) register, and switched to automatically when taking an exception.
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 static ALWAYS_INLINE void _InterruptStackSetup(void)
 {
 	uint32_t msp = __GET_MSP();
@@ -64,5 +65,9 @@ static ALWAYS_INLINE void _InterruptStackSetup(void)
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _ARM_CORTEXM_STACK__H_ */

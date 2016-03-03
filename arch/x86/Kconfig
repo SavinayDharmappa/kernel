@@ -16,64 +16,34 @@
 # limitations under the License.
 #
 
-config X86_32
-	def_bool y
+menu "x86 architecture"
+	depends on X86
+
+config ARCH
+        default "x86"
+
+config X86_IAMCU
+	bool
+	default n
+	prompt "IAMCU calling convention"
+	help
+	The IAMCU calling convention changes the X86 C calling convention to
+	pass some arguments via registers allowing for code size and performance
+	improvements.  Great care needs to be taken if you have assembly code
+	that will be called from C or C code called from assembly code, the
+	assembly code will need to be updated to conform to the new calling
+	convention.  If in doubt say N
 
 config ARCH_DEFCONFIG
 	string
 	default "arch/x86/defconfig"
 
-source "kernel/Kconfig"
 
-menu "X86 Platform Configuration options"
-
-config RAM_SIZE
-	int "Amount of RAM given to the kernel (in kb)"
-	help
-	The Amount of RAM given to the kernel. Must be less or equal to the amount
-	available on the target, and big enough to contain the full image when not
-	running a XIP kernel, and the data/bss/noinit sections when running a XIP
-	kernel.
-
-	The different platforms specify the default value.
-
-config ROM_SIZE
-	int "Amount of ROM given to the kernel (in kb)" if XIP
-	help
-	The Amount of ROM given to the kernel. Must be less or equal to the amount
-	available on the target, and big enough to contain the full image.
-
-	The different platforms specify the default value.
+source "arch/x86/core/Kconfig"
 
 choice
-prompt "Platform Selection"
-default PLATFORM_IA32_PCI
-
-config PLATFORM_GALILEO
-	bool "Galileo Gen2"
-	select HPET_TIMER
-	select EOI_HANDLER_SUPPORTED
-	select BOOTLOADER_UNKNOWN
-	select PCI
-	help
-	The Intel® Galileo Gen 2 development board is a microcontroller board
-	based on the Intel® Quark™ SoC X1000 application processor, a 32-bit
-	Intel® Pentium® brand system on a chip (SoC). It is the first board
-	based on Intel® architecture designed to be hardware and software
-	pin-compatible with shields designed for the Arduino Uno* R3.
-
-config PLATFORM_IA32_PCI
-	bool "IA32 with PCI"
-	select HPET_TIMER
-	select EOI_HANDLER_SUPPORTED
-	select BOOTLOADER_UNKNOWN
-	select PCI
-
-config PLATFORM_IA32
-	bool "IA32"
-	select EOI_HANDLER_SUPPORTED
-	select BOOTLOADER_UNKNOWN
-
+prompt "SoC Selection"
+source "arch/x86/soc/*/Kconfig.soc"
 endchoice
 
 choice
@@ -83,76 +53,84 @@ default CPU_MINUTEIA
 config CPU_ATOM
 	bool "Atom"
 	select CMOV
+	select CPU_MIGHT_SUPPORT_CLFLUSH if CACHE_FLUSHING
 	help
 	This option signifies the use of a CPU from the Atom family.
 
 config CPU_MINUTEIA
 	bool "Minute IA"
+	select CPU_MIGHT_SUPPORT_CLFLUSH if CACHE_FLUSHING
 	help
 	This option signifies the use of a CPU from the Minute IA family.
 endchoice
 
-config CACHE_FLUSHING
-	bool
-	default n
-	prompt "Enable cache flushing mechanism"
-	help
-	This links in the sys_cache_flush() function. A mechanism for flushing the
-	cache must be selected as well. By default, that mechanism is discovered at
-	runtime.
-
-menu "Platform Capabilities"
-config ADVANCED_IDLE_SUPPORTED
-	bool "Advanced Idle Supported"
-	default n
-	help
-	This option signifies that the target supports the ADVANCED_IDLE
-	configuration option.
-
-config EOI_HANDLER_SUPPORTED
-	bool "EOI Handler Supported"
-	default n
-	help
-	This option signifies that the target has one or more devices whose
-	driver utilizes an "end of interrupt" handler that gets called
-	after the standard interrupt handling code. This capability
-	can be used by the driver to tell the device that an interrupt
-	has been handled (or for other purposes).
-
-config UNALIGNED_WRITE_UNSUPPORTED
-	bool "Unaligned Write Unsupported"
-	default n
-	help
-	This option signifies that the target may not properly decode the
-	IA-32 processor's byte enable (BE) lines, resulting in the inability
-	to read/write unaligned quantities.
-
-config LOCK_INSTRUCTION_UNSUPPORTED
-	bool "Lock Instruction Unsupported"
-	default n
-	help
-	This option signifies that the target lacks support for the IA-32
-	LOCK prefix instruction. Code running on such targets cannot
-	use the LOCK prefix to perform read-modify-write operations in an
-	atomic manner; such targets must utilize other techniques to perform
-	atomic operations (such as locking interrupts).
-
-config NUM_DYNAMIC_STUBS
-	int "Number of dynamic int stubs"
-	default 0
-	help
-	This option specifies the number of interrupt handlers that can be
-	installed dynamically using irq_connect().
-
-config PIC_DISABLE
-	bool "Disable PIC"
-	default n
-	help
-	This option disables all interrupts on the PIC
-
-endmenu
 
 menu "Processor Capabilities"
+menu "Floating Point Options"
+
+config  FLOAT
+	bool
+	prompt "Floating point registers"
+	default n
+	help
+	This option allows tasks and fibers to use the floating point registers.
+	By default, only a single task or fiber may use the registers, and only
+	the x87 FPU/MMX registers may be used.
+
+	Disabling this option means that any task or fiber that uses a
+	floating point register will get a fatal exception.
+
+config  FP_SHARING
+	bool
+	prompt "Floating point register sharing"
+	depends on FLOAT
+	default n
+	help
+	This option allows multiple tasks and fibers to use the floating point
+	registers. Any task that uses the floating point registers must provide
+	stack space where the kernel can save these registers during context
+	switches; a task that uses only the x87 FPU/MMX registers must provide
+	108 bytes of added stack space, while a task the uses the SSE registers
+	must provide 464 bytes of added stack space.
+
+config  SSE
+	bool
+	prompt "SSE registers"
+	depends on FLOAT
+	default n
+	help
+	This option enables the use of SSE registers by tasks and fibers.
+
+config SSE_FP_MATH
+	bool
+	prompt "Compiler-generated SSEx instructions"
+	depends on SSE
+	default n
+	help
+	This option allows the compiler to generate SSEx instructions for
+	performing floating point math. This can greatly improve performance
+	when exactly the same operations are to be performed on multiple
+	data objects; however, it can also significantly reduce performance
+	when pre-emptive task switches occur because of the larger register
+	set that must be saved and restored.
+
+	Disabling this option means that the compiler utilizes only the
+	x87 instruction set for floating point operations.
+
+choice
+prompt "Reboot implementation"
+depends on REBOOT
+default REBOOT_RST_CNT
+
+config REBOOT_RST_CNT
+	bool
+	prompt "Reboot via RST_CNT register"
+	help
+	Reboot via the RST_CNT register, going back to BIOS.
+
+endchoice
+
+endmenu
 
 config ISA_IA32
 	bool
@@ -185,7 +163,7 @@ config CACHE_LINE_SIZE_DETECT
 	size at the expense of taking more memory and code and a slightly increased
 	boot time.
 
-	If you know the cache line size of the CPU, disable this option and
+	If the CPU's cache line size is known in advance, disable this option and
 	manually enter the value for CACHE_LINE_SIZE.
 
 config CACHE_LINE_SIZE
@@ -199,128 +177,123 @@ config CACHE_LINE_SIZE
 
 	Detect automatically at runtime by selecting CACHE_LINE_SIZE_DETECT.
 
+config CPU_MIGHT_SUPPORT_CLFLUSH
+	bool
+	depends on CACHE_FLUSHING
+	default n
+	help
+	If a platform uses a processor that possibly implements CLFLUSH, change
+	the default in that platform's config file.
+
 config CLFLUSH_INSTRUCTION_SUPPORTED
 	bool
-	prompt "CLFLUSH instruction supported" if !CLFLUSH_DETECT
-	depends on !CLFLUSH_DETECT
+	prompt "CLFLUSH instruction supported" if CPU_MIGHT_SUPPORT_CLFLUSH
+	depends on CPU_MIGHT_SUPPORT_CLFLUSH && !CLFLUSH_DETECT
 	default n
 	help
 	An implementation of sys_cache_flush() that uses CLFLUSH is made
 	available, instead of the one using WBINVD.
 
-	Only enable this if you know the CPU supports the CLFLUSH instruction.
-	This disable runtime detetion and saves memory as well as boot time.
+	This option should only be enabled if it is known in advance that the
+	CPU supports the CLFLUSH instruction. It disables runtime detection of
+	CLFLUSH support thereby reducing both memory footprint and boot time.
 
 config CLFLUSH_DETECT
 	bool
 	prompt "Detect support of CLFLUSH instruction at runtime"
+	depends on CPU_MIGHT_SUPPORT_CLFLUSH
 	default y
 	help
-	Enable this if you do not know if the CPU supports or not the CLFLUSH
-	instruction.
+	This option should be enabled if it is not known in advance whether the
+	CPU supports the CLFLUSH instruction or not.
 
-	This links in multiple implementations of sys_cache_flush and takes time
-	at initialization to detect the capability and install the correct
-	implementation.
+	The CPU is queried at boot time to determine which of the multiple
+	implementations of sys_cache_flush() linked into the image is the
+	correct one to use.
 
-	If you know that the CPU does or does not support CLFLUSH, disable this
-	option and set CLFLUSH_INSTRUCTION_SUPPORTED to the proper value.
+	If the CPU's support (or lack thereof) of CLFLUSH is known in advance, then
+	disable this option and set CLFLUSH_INSTRUCTION_SUPPORTED as appropriate.
 
 config ARCH_CACHE_FLUSH_DETECT
 	bool
 	default y
 	depends on CLFLUSH_DETECT
 
+config CACHE_FLUSHING
+	bool
+	default n
+	prompt "Enable cache flushing mechanism"
+	help
+	This links in the sys_cache_flush() function. A mechanism for flushing the
+	cache must be selected as well. By default, that mechanism is discovered at
+	runtime.
 endmenu
 
-menu "Floating Point Options"
-
-config  FLOAT
-	bool
-	prompt "Floating point instructions"
+menu "Platform Capabilities"
+config ADVANCED_IDLE_SUPPORTED
+	bool "Advanced Idle Supported"
 	default n
 	help
-	This option enables the use of x87 FPU and MMX instructions by
-	a task or fiber.
+	This option signifies that the target supports the ADVANCED_IDLE
+	configuration option.
 
-	Disabling this option means that any task or fiber that uses a
-	floating point instruction will get a fatal exception.
+config NUM_DYNAMIC_STUBS
+	int "Number of dynamic int stubs"
+	default 0
+	help
+	This option specifies the number of interrupt handlers that can be
+	installed dynamically using irq_connect_dynamic().
 
-config  FP_SHARING
-	bool
-	prompt "Floating point resource sharing"
-	depends on FLOAT
+config NUM_DYNAMIC_EXC_STUBS
+	int "Number of dynamic exception stubs"
+	default 1 if GDB_SERVER
+	default 0
+	help
+	This option specifies the maximum number of dynamically allocated
+	exception stubs that are to be used with exceptions that push an
+	error code onto the stack.
+
+config NUM_DYNAMIC_EXC_NOERR_STUBS
+	int "Number of dynamic no-error exception stubs"
+	default 3 if GDB_SERVER
+	default 0
+	help
+	This option specifies the maximum number of dynamically allocated
+	exception stubs that are to be used with exceptions that do not push
+	an error code onto the stack.
+
+config PIC_DISABLE
+	bool "Disable PIC"
 	default n
 	help
-	This option allows multiple tasks and fibers to safely utilize
-	floating point hardware resources. Every task or fiber that wishes
-	to use floating point instructions (i.e. x87 FPU, MMX, or SSEx) must
-	be created with such support already enabled, or must enable this
-	support via task_float_enable() or fiber_float_enable() before
-	executing these instructions.
+	This option disables all interrupts on the PIC
 
-	Enabling this option adds 108 bytes to the stack size requirement
-	of each task or fiber that utilizes x87 FPU or MMX instructions,
-	and adds 464 bytes to the stack size requirement of each task or
-	fiber that utilizes SSEx instructions. (The stack size requirement
-	of tasks and fibers that do not utilize floating point instructions
-	remains unchanged.)
-
-	Disabling this option means that only a single task or fiber may
-	utilize x87 FPU, MMX, or SSEx instructions. (The stack size
-	requirement of all tasks and fibers remains unchanged.)
-
-config  SSE
-	bool
-	prompt "SSEx instructions"
-	depends on FLOAT
+config IRQ_OFFLOAD
+	bool "Enable IRQ offload"
 	default n
 	help
-	This option enables the use of SSEx instructions by a task or fiber.
+	Enable irq_offload() API which allows functions to be synchronously
+	run in interrupt context. Uses one entry in the	IDT.  Mainly useful
+	for test cases.
 
-	Disabling this option means that no task or fiber may use SSEx
-	instructions; any such use will result in undefined behavior.
-
-config SSE_FP_MATH
-	bool
-	prompt "Compiler-generated SSEx instructions"
-	depends on SSE
-	default n
+config IRQ_OFFLOAD_VECTOR
+	int "IDT vector to use for IRQ offload"
+	default 63 if MVIC
+	default 32
+	range 32 255
+	depends on IRQ_OFFLOAD
 	help
-	This option allows the compiler to generate SSEx instructions for
-	performing floating point math. This can greatly improve performance
-	when exactly the same operations are to be performed on multiple
-	data objects; however, it can also significantly reduce performance
-	when pre-emptive task switches occur because of the larger register
-	set that must be saved and restored.
-
-	Disabling this option means that the compiler utilizes only the
-	x87 instruction set for floating point operations.
+	Specify the IDT vector to use for the IRQ offload interrupt handler.
+	The default should be fine for most arches, but on systems like MVIC
+	where there is a fixed IRQ-to-vector mapping another value may be
+	needed to avoid collision.
 
 config XIP
 	default n
-
 endmenu
 
 
-source "arch/x86/core/Kconfig"
+
+source "arch/x86/soc/*/Kconfig"
 
 endmenu
-
-if PLATFORM_IA32
-source "arch/x86/platforms/ia32/Kconfig"
-endif
-
-if PLATFORM_IA32_PCI
-source "arch/x86/platforms/ia32_pci/Kconfig"
-endif
-
-if PLATFORM_GALILEO
-source "arch/x86/platforms/galileo/Kconfig"
-endif
-
-source "drivers/Kconfig"
-
-source "net/Kconfig"
-
-source "misc/Kconfig"

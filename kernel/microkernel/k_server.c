@@ -1,5 +1,3 @@
-/* k_server.c - microkernel server */
-
 /*
  * Copyright (c) 2010, 2012-2015 Wind River Systems, Inc.
  *
@@ -16,13 +14,15 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module implements the microkernel server, which processes service requests
-from tasks (and, less commonly, fibers and ISRs). The requests are service by
-a high priority fiber, thereby ensuring that requests are processed in a timely
-manner and in a single threaded manner that prevents simultaneous requests from
-interfering with each other.
+/**
+ * @file
+ * @brief Microkernel server
+ *
+ * This module implements the microkernel server, which processes service
+ * requests from tasks (and, less commonly, fibers and ISRs). The requests are
+ * service by a high priority fiber, thereby ensuring that requests are
+ * processed in a timely manner and in a single threaded manner that prevents
+ * simultaneous requests from interfering with each other.
  */
 
 #include <toolchain.h>
@@ -46,7 +46,6 @@ extern const kernelfunc _k_server_dispatch_table[];
  *
  * @return pointer to selected task
  */
-
 static struct k_task *next_task_select(void)
 {
 	int K_PrioListIdx;
@@ -82,7 +81,6 @@ static struct k_task *next_task_select(void)
  *
  * @return Does not return.
  */
-
 FUNC_NORETURN void _k_server(int unused1, int unused2)
 {
 	struct k_args *pArgs;
@@ -97,41 +95,64 @@ FUNC_NORETURN void _k_server(int unused1, int unused2)
 	_nanokernel.current->flags |= ESSENTIAL;
 
 	while (1) { /* forever */
-		pArgs = (struct k_args *)nano_fiber_stack_pop_wait(
-			&_k_command_stack); /* will schedule */
+		(void) nano_fiber_stack_pop(&_k_command_stack, (uint32_t *)&pArgs,
+				TICKS_UNLIMITED); /* will schedule */
 		do {
-			kevent_t event;
-			/* if event < _k_num_events, it's a well-known event */
-			event = (kevent_t)(pArgs);
-			if (event < (kevent_t)_k_num_events) {
-#ifdef CONFIG_TASK_MONITOR
-				if (_k_monitor_mask & MON_EVENT) {
-					_k_task_monitor_args(pArgs);
-				}
-#endif
-				_k_do_event_signal(event);
-			} else {
+			int cmd_type = (int)pArgs & KERNEL_CMD_TYPE_MASK;
+
+			if (cmd_type == KERNEL_CMD_PACKET_TYPE) {
+
+				/* process command packet */
+
 #ifdef CONFIG_TASK_MONITOR
 				if (_k_monitor_mask & MON_KSERV) {
 					_k_task_monitor_args(pArgs);
 				}
 #endif
 				(*pArgs->Comm)(pArgs);
+			} else if (cmd_type == KERNEL_CMD_EVENT_TYPE) {
+
+				/* give event */
+
+#ifdef CONFIG_TASK_MONITOR
+				if (_k_monitor_mask & MON_EVENT) {
+					_k_task_monitor_args(pArgs);
+				}
+#endif
+				kevent_t event = (int)pArgs & ~KERNEL_CMD_TYPE_MASK;
+
+				_k_do_event_signal(event);
+			} else { /* cmd_type == KERNEL_CMD_SEMAPHORE_TYPE */
+
+				/* give semaphore */
+
+#ifdef CONFIG_TASK_MONITOR
+				/* task monitoring for giving semaphore not implemented */
+#endif
+				ksem_t sem = (int)pArgs & ~KERNEL_CMD_TYPE_MASK;
+
+				_k_sem_struct_value_update(1, (struct _k_sem_struct *)sem);
 			}
 
-			/* check if another fiber (of equal or greater priority)
-			 * needs to run */
+			/*
+			 * check if another fiber (of equal or greater priority)
+			 * needs to run
+			 */
 
 			if (_nanokernel.fiber) {
 				fiber_yield();
 			}
-		} while (nano_fiber_stack_pop(&_k_command_stack, (void *)&pArgs));
+		} while (nano_fiber_stack_pop(&_k_command_stack, (uint32_t *)&pArgs,
+					TICKS_NONE));
 
 		pNextTask = next_task_select();
 
 		if (_k_current_task != pNextTask) {
 
-			/* switch from currently selected task to a different one */
+			/*
+			 * switch from currently selected task to a different
+			 * one
+			 */
 
 #ifdef CONFIG_WORKLOAD_MONITOR
 			if (pNextTask->id == 0x00000000) {

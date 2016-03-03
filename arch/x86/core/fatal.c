@@ -1,5 +1,3 @@
-/* fatal.c - nanokernel fatal error handler */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module provides the _NanoFatalErrorHandler() routine.
+/**
+ * @file
+ * @brief Nanokernel fatal error handler
+ *
+ * This module provides the _NanoFatalErrorHandler() routine.
  */
 
 #include <toolchain.h>
@@ -27,11 +27,13 @@ This module provides the _NanoFatalErrorHandler() routine.
 #include <nanokernel.h>
 #include <nano_private.h>
 #include <misc/printk.h>
+#include <asmPrv.h>
+#include <drivers/loapic.h>
+
 #ifdef CONFIG_GDB_SERVER
 #include <debug/gdb_arch.h>
-#include <debug/gdb_server.h>
+#include <misc/debug/gdb_server.h>
 #endif
-
 
 /*
  * Define a default ESF for use with _NanoFatalErrorHandler() in the event
@@ -63,15 +65,13 @@ const NANO_ESF _default_esf = {
  * fatal error does not have a hardware generated ESF, the caller should either
  * create its own or use a pointer to the global default ESF <_default_esf>.
  *
- * @return This function does not return.
+ * @param reason the reason that the handler was called
+ * @param pEsf pointer to the exception stack frame
  *
- * \NOMANUAL
+ * @return This function does not return.
  */
-
-FUNC_NORETURN void _NanoFatalErrorHandler(
-	unsigned int reason, /* reason that handler was called */
-	const NANO_ESF *pEsf /* pointer to exception stack frame */
-	)
+FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
+					  const NANO_ESF *pEsf)
 {
 #ifdef CONFIG_GDB_SERVER
 	GDB_REG_SET regs;
@@ -86,11 +86,13 @@ FUNC_NORETURN void _NanoFatalErrorHandler(
 	/* Display diagnostic information about the error */
 
 	switch (reason) {
-	case _NANO_ERR_SPURIOUS_INT:
-		printk("***** Unhandled exception/interrupt occurred! "
-		       "*****\n");
+	case _NANO_ERR_CPU_EXCEPTION:
 		break;
 
+	case _NANO_ERR_SPURIOUS_INT:
+		printk("***** Unhandled interrupt vector %d occurred! "
+		       "*****\n", _loapic_isr_vector_get());
+		break;
 
 	case _NANO_ERR_INVALID_TASK_EXIT:
 		printk("***** Invalid Exit Software Error! *****\n");
@@ -113,15 +115,15 @@ FUNC_NORETURN void _NanoFatalErrorHandler(
 	}
 
 	printk("Current thread ID = 0x%x\n"
-	       "Faulting instruction address = 0x%x\n",
+	       "Faulting segment:address = 0x%x:0x%x\n"
+	       "eax: 0x%x, ebx: 0x%x, ecx: 0x%x, edx: 0x%x\n"
+	       "esi: 0x%x, edi: 0x%x, ebp: 0%x, esp: 0x%x\n"
+	       "eflags: 0x%x\n",
 	       sys_thread_self_get(),
-	       pEsf->eip);
-	printk("eax: %x, ebx: %x, ecx: %x, edx: %x\n"
-			"esi: %x, edi: %x, ebp: %x, esp: %x\n"
-			"eflags: %x\n",
-			pEsf->eax, pEsf->ebx, pEsf->ecx, pEsf->edx,
-			pEsf->esi, pEsf->edi, pEsf->ebp, pEsf->esp,
-			pEsf->eflags);
+	       pEsf->cs & 0xFFFF, pEsf->eip,
+	       pEsf->eax, pEsf->ebx, pEsf->ecx, pEsf->edx,
+	       pEsf->esi, pEsf->edi, pEsf->ebp, pEsf->esp,
+	       pEsf->eflags);
 #endif /* CONFIG_PRINTK */
 
 
@@ -132,3 +134,42 @@ FUNC_NORETURN void _NanoFatalErrorHandler(
 
 	_SysFatalErrorHandler(reason, pEsf);
 }
+
+#if CONFIG_EXCEPTION_DEBUG
+
+static FUNC_NORETURN void generic_exc_handle(unsigned int vector,
+					     const NANO_ESF *pEsf)
+{
+	printk("***** CPU exception %d\n", vector);
+	if ((1 << vector) & _EXC_ERROR_CODE_FAULTS) {
+		printk("***** Exception code: 0x%x\n", pEsf->errorCode);
+	}
+	_NanoFatalErrorHandler(_NANO_ERR_CPU_EXCEPTION, pEsf);
+}
+
+#define EXC_FUNC(vector) \
+FUNC_NORETURN void handle_exc_##vector(const NANO_ESF *pEsf) \
+{ \
+	generic_exc_handle(vector, pEsf); \
+}
+
+EXC_FUNC(IV_DIVIDE_ERROR);
+EXC_FUNC(IV_NON_MASKABLE_INTERRUPT);
+EXC_FUNC(IV_OVERFLOW);
+EXC_FUNC(IV_BOUND_RANGE);
+EXC_FUNC(IV_INVALID_OPCODE);
+#ifndef CONFIG_FP_SHARING
+EXC_FUNC(IV_DEVICE_NOT_AVAILABLE);
+#endif
+EXC_FUNC(IV_DOUBLE_FAULT);
+EXC_FUNC(IV_INVALID_TSS);
+EXC_FUNC(IV_SEGMENT_NOT_PRESENT);
+EXC_FUNC(IV_STACK_FAULT);
+EXC_FUNC(IV_GENERAL_PROTECTION);
+EXC_FUNC(IV_PAGE_FAULT);
+EXC_FUNC(IV_X87_FPU_FP_ERROR);
+EXC_FUNC(IV_ALIGNMENT_CHECK);
+EXC_FUNC(IV_MACHINE_CHECK);
+
+#endif /* CONFIG_EXCEPTION_DEBUG */
+

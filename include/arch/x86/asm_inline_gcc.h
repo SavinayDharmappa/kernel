@@ -28,6 +28,10 @@
 
 #include <sys_io.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _ASMLANGUAGE
 #include <stdint.h>
 #include <stddef.h>
@@ -239,7 +243,9 @@ static inline __attribute__((always_inline))
 static inline __attribute__((always_inline))
 	void sys_out8(uint8_t data, io_port_t port)
 {
-	__asm__ volatile("outb	%%al, %%dx;\n\t" : : "a"(data), "d"(port));
+	__asm__ volatile("outb	%b0, %w1;\n\t"
+			 :
+			 : "a"(data), "Nd"(port));
 }
 
 
@@ -248,7 +254,9 @@ static inline __attribute__((always_inline))
 {
 	uint8_t ret;
 
-	__asm__ volatile("inb	%%dx, %%al;\n\t" : "=a"(ret) : "d"(port));
+	__asm__ volatile("inb	%w1, %b0;\n\t"
+			 : "=a"(ret)
+			 : "Nd"(port));
 	return ret;
 }
 
@@ -256,7 +264,9 @@ static inline __attribute__((always_inline))
 static inline __attribute__((always_inline))
 	void sys_out16(uint16_t data, io_port_t port)
 {
-	__asm__ volatile("outw	%%ax, %%dx;\n\t" :  : "a"(data), "d"(port));
+	__asm__ volatile("outw	%w0, %w1;\n\t"
+			 :
+			 : "a"(data), "Nd"(port));
 }
 
 
@@ -265,7 +275,9 @@ static inline __attribute__((always_inline))
 {
 	uint16_t ret;
 
-	__asm__ volatile("inw	%%dx, %%ax;\n\t" : "=a"(ret) : "d"(port));
+	__asm__ volatile("inw	%w1, %w0;\n\t"
+			 : "=a"(ret)
+			 : "Nd"(port));
 	return ret;
 }
 
@@ -273,7 +285,9 @@ static inline __attribute__((always_inline))
 static inline __attribute__((always_inline))
 	void sys_out32(uint32_t data, io_port_t port)
 {
-	__asm__ volatile("outl	%%eax, %%dx;\n\t" :  : "a"(data), "d"(port));
+	__asm__ volatile("outl	%0, %w1;\n\t"
+			 :
+			 : "a"(data), "Nd"(port));
 }
 
 
@@ -282,7 +296,69 @@ static inline __attribute__((always_inline))
 {
 	uint32_t ret;
 
-	__asm__ volatile("inl	%%dx, %%eax;\n\t" : "=a"(ret) : "d"(port));
+	__asm__ volatile("inl	%w1, %0;\n\t"
+			 : "=a"(ret)
+			 : "Nd"(port));
+	return ret;
+}
+
+
+static inline __attribute__((always_inline))
+	void sys_io_set_bit(io_port_t port, int bit)
+{
+	uint32_t reg = 0;
+
+	__asm__ volatile("inl	%w1, %0;\n\t"
+			 "btsl	%2, %0;\n\t"
+			 "outl	%0, %w1;\n\t"
+			 :
+			 : "a" (reg), "Nd" (port), "Ir" (bit));
+}
+
+static inline __attribute__((always_inline))
+	void sys_io_clear_bit(io_port_t port, int bit)
+{
+	uint32_t reg = 0;
+
+	__asm__ volatile("inl	%w1, %0;\n\t"
+			 "btrl	%2, %0;\n\t"
+			 "outl	%0, %w1;\n\t"
+			 :
+			 : "a" (reg), "Nd" (port), "Ir" (bit));
+}
+
+static inline __attribute__((always_inline))
+	int sys_io_test_bit(io_port_t port, int bit)
+{
+	uint32_t ret;
+
+	__asm__ volatile("inl	%w1, %0\n\t"
+			 "btl	%2, %0\n\t"
+			 : "=a" (ret)
+			 : "Nd" (port), "Ir" (bit));
+
+	return (ret & 1);
+}
+
+static inline __attribute__((always_inline))
+	int sys_io_test_and_set_bit(io_port_t port, int bit)
+{
+	int ret;
+
+	ret = sys_io_test_bit(port, bit);
+	sys_io_set_bit(port, bit);
+
+	return ret;
+}
+
+static inline __attribute__((always_inline))
+	int sys_io_test_and_clear_bit(io_port_t port, int bit)
+{
+	int ret;
+
+	ret = sys_io_test_bit(port, bit);
+	sys_io_clear_bit(port, bit);
+
 	return ret;
 }
 
@@ -410,4 +486,9 @@ static inline __attribute__((always_inline))
 }
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ASM_INLINE_GCC_PUBLIC_GCC_H */

@@ -32,11 +32,28 @@ config CONSOLE_HAS_DRIVER
 config CONSOLE_HANDLER
 	bool
 	prompt "Enable console input handler"
+	depends on UART_CONSOLE
 	select UART_INTERRUPT_DRIVEN
 	default n
 	help
 	This option enables console input handler allowing to write simple
 	interaction between serial console and the OS.
+
+config CONSOLE_HANDLER_SHELL
+	bool
+	prompt "Enable console input handler [ Experimental ]"
+	default n
+	depends on CONSOLE_HANDLER
+	help
+	Shell implementation based on CONSOLE_HANDLER.
+
+config CONSOLE_HANDLER_SHELL_STACKSIZE
+	int
+	prompt "Console handler shell stack size"
+	default 2000
+	depends on CONSOLE_HANDLER_SHELL
+	help
+	Stack size for the console handler shell.
 
 config UART_CONSOLE
 	bool
@@ -46,24 +63,39 @@ config UART_CONSOLE
 	select CONSOLE_HAS_DRIVER
 	help
 	Enable this option to use one UART for console. Make sure
-	CONFIG_UART_CONSOLE_INDEX is also set correctly.
+	CONFIG_UART_CONSOLE_ON_DEV_NAME is also set correctly.
 
-config UART_CONSOLE_INDEX
-	int "UART Console Index"
-	default 0
+config UART_CONSOLE_ON_DEV_NAME
+	string "Device Name of UART Device for UART Console"
+	default "UART_0"
 	depends on UART_CONSOLE
 	help
-	This option specifies index for the console uart port.
+	This option specifies the name of UART device to be used for
+	UART console.
 
-config UART_CONSOLE_BAUDRATE
-	int "UART Console Baud Rate"
-	default 115200
+config UART_CONSOLE_IRQ
+	int "IRQ of UART Device for UART Console"
 	depends on UART_CONSOLE
 	help
-	This specifies the baud rate for the UART console.
+	This option specifies the IRQ of UART device to be used for
+	UART console.
 
-	Default is 115200, which should be usable for most RS232
-	and USB adapters.
+config UART_CONSOLE_IRQ_PRI
+	int "IRQ of UART Device for UART Console"
+	depends on UART_CONSOLE
+	help
+	This option specifies the IRQ priorityof UART device to be
+	used for UART console.
+
+config UART_CONSOLE_PRIORITY
+	int
+	prompt "Init priority"
+	default 60
+	depends on UART_CONSOLE
+	help
+	  Device driver initialization priority.
+	  Console has to be initialized after the UART driver
+	  it uses.
 
 config RAM_CONSOLE
 	bool
@@ -83,20 +115,63 @@ config RAM_CONSOLE_BUFFER_SIZE
 	Size of the RAM console buffer. Messages will wrap around if the
 	length is exceeded.
 
-config IPI_CONSOLE_SENDER
+config IPM_CONSOLE_SENDER
 	bool
-	prompt "Inter-processor Interrupt console sender"
+	prompt "Inter-processor Mailbox console sender"
 	select CONSOLE_HAS_DRIVER
 	default n
 	help
-	Enable the sending side of IPI console
+	Enable the sending side of IPM console
 
-config IPI_CONSOLE_RECEIVER
+config IPM_CONSOLE_RECEIVER
 	bool
-	prompt "Inter-processor interrupt console receiver"
+	prompt "Inter-processor Mailbox console receiver"
 	select RING_BUFFER
 	default n
 	help
-	Enable the receiving side of IPI console
+	Enable the receiving side of IPM console
+
+config IPM_CONSOLE_PRIORITY
+	int
+	prompt "IPM console init priority"
+	default 60
+	depends on IPM_CONSOLE_SENDER || IPM_CONSOLE_RECEIVER
+	help
+	  Device driver initialization priority.
+	  Console has to be initialized after the IPM subsystem
+	  it uses.
+
+config	UART_PIPE
+	bool
+	prompt "Enable pipe UART driver"
+	select UART_INTERRUPT_DRIVEN
+	default n
+	help
+	Enable pipe UART driver. This driver allows application to communicate
+	over UART with custom defined protocol. Driver doesn't inspect received
+	data (as contrary to console UART driver) and all aspects of received
+	protocol data are handled by application provided callback.
+
+config  UART_PIPE_ON_DEV_NAME
+	string "Device Name of UART Device for pipe UART"
+	default "UART_0"
+	depends on UART_PIPE
+	help
+	This option specifies the name of UART device to be used
+	for pipe UART.
+
+config  UART_PIPE_IRQ
+	int "IRQ for pipe UART"
+	depends on UART_PIPE
+	help
+	This option specifies the IRQ of UART device to be used
+	for pipe UART.
+
+config  UART_PIPE_IRQ_PRI
+	int "IRQ Priority for pipe UART"
+	depends on UART_PIPE
+	help
+	This option specifies the IRQ priority of UART device
+	to be used for pipe UART.
 
 endif

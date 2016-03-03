@@ -37,25 +37,24 @@ int fputc(int c, FILE *stream)
 	return (stdout == stream) ? _stdout_hook(c) : EOF;
 }
 
-int fputs(const char *restrict string, FILE *restrict stream)
+int fputs(const char *_Restrict string, FILE *_Restrict stream)
 {
-	int c;
-
 	if (stream != stdout) {
 		return EOF;
 	}
 
-	for (c = (int) *string; c != 0; string++) {
-		if (_stdout_hook(c) == EOF) {
+	while (*string != '\0') {
+		if (_stdout_hook((int)*string) == EOF) {
 			return EOF;
 		}
+		string++;
 	}
 
 	return 0;
 }
 
-size_t fwrite(const void *restrict ptr, size_t size, size_t nitems,
-			  FILE *restrict stream)
+size_t fwrite(const void *_Restrict ptr, size_t size, size_t nitems,
+			  FILE *_Restrict stream)
 {
 	size_t i;
 	size_t j;

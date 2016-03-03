@@ -1,5 +1,3 @@
-/* aux_regs.h - ARCv2 auxiliary registers definitions */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,14 +14,20 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Definitions for auxiliary registers.
+/**
+ * @file
+ * @brief ARCv2 auxiliary registers definitions
+ *
+ *
+ * Definitions for auxiliary registers.
  */
 
 #ifndef _ARC_V2_AUX_REGS__H_
 #define _ARC_V2_AUX_REGS__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define _ARC_V2_LP_START 0x002
 #define _ARC_V2_LP_END 0x003
@@ -58,7 +62,7 @@ Definitions for auxiliary registers.
 #define _ARC_V2_STATUS32_H (1 << 0)
 #define _ARC_V2_STATUS32_E(x) ((x) << 1)
 #define _ARC_V2_STATUS32_AE_BIT 5
-#define _ARC_V2_STATUS32_AE (1 << ARC_V2_STATUS32_AE_BIT)
+#define _ARC_V2_STATUS32_AE (1 << _ARC_V2_STATUS32_AE_BIT)
 #define _ARC_V2_STATUS32_DE (1 << 6)
 #define _ARC_V2_STATUS32_U (1 << 7)
 #define _ARC_V2_STATUS32_V (1 << 8)
@@ -103,5 +107,9 @@ Definitions for auxiliary registers.
 	})
 #endif /* __GNUC__ */
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _ARC_V2_AUX_REGS__H_ */

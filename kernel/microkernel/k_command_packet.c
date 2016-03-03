@@ -34,29 +34,6 @@ uint32_t _k_test_cmd_pkt_size
 	[0 - ((CMD_PKT_SIZE_IN_WORDS * sizeof(uint32_t)) != sizeof(struct k_args))];
 
 /**
- * @brief Get the next command packet
- *
- * This routine gets the next command packet from the specified set.
- * @param pSet Pointer to set of command packets
- *
- * @return pointer to the command packet
- */
-cmdPkt_t *_cmd_pkt_get(struct cmd_pkt_set *pSet)
-{
-	uint32_t index; /* index into command packet array */
-	int key;	/* interrupt lock level */
-
-	key = irq_lock();
-	index = pSet->index;
-	pSet->index++;
-	if (pSet->index >= pSet->num_packets)
-		pSet->index = 0;
-	irq_unlock(key);
-
-	return &pSet->command_packet[index];
-}
-
-/**
  *
  * @brief Send command packet to be processed by _k_server
  * @param cmd_packet Arguments

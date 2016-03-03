@@ -1,5 +1,3 @@
-/* nmi.c - NMI handler infrastructure */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,11 +14,13 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Provides a boot time handler that simply hangs in a sleep loop, and a run time
-handler that resets the CPU. Also provides a mechanism for hooking a custom
-run time handler.
+/**
+ * @file
+ * @brief NMI handler infrastructure
+ *
+ * Provides a boot time handler that simply hangs in a sleep loop, and a run
+ * time handler that resets the CPU. Also provides a mechanism for hooking a
+ * custom run time handler.
  */
 
 #include <nanokernel.h>

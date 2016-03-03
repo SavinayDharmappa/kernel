@@ -1,1 +1,4 @@
-obj-$(CONFIG_I2C_DW) += i2c-dw.o i2c_static_irq_stubs.o
+ccflags-$(CONFIG_I2C_QMSI) +=-I$(CONFIG_QMSI_INSTALL_PATH)/include
+obj-$(CONFIG_I2C_DW) += i2c_dw.o
+obj-$(CONFIG_I2C_QMSI) += i2c_qmsi.o
+obj-$(CONFIG_I2C_QUARK_SE_SS) += i2c_quark_se_ss.o

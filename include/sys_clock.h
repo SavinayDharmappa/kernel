@@ -1,5 +1,3 @@
-/* Variables needed needed for system clock */
-
 /*
  * Copyright (c) 2014-2015 Wind River Systems, Inc.
  *
@@ -16,15 +14,21 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-
-Declare variables used by both system timer device driver and kernel components
-that use timer functionality.
+/**
+ * @file
+ * @brief Variables needed needed for system clock
+ *
+ *
+ * Declare variables used by both system timer device driver and kernel
+ * components that use timer functionality.
  */
 
 #ifndef _SYS_CLOCK__H_
 #define _SYS_CLOCK__H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef _ASMLANGUAGE
 #include <stdint.h>
@@ -35,7 +39,12 @@ that use timer functionality.
 #endif
 
 #define sys_clock_ticks_per_sec CONFIG_SYS_CLOCK_TICKS_PER_SEC
+
+#if defined(CONFIG_TIMER_READS_ITS_FREQUENCY_AT_RUNTIME)
+extern int sys_clock_hw_cycles_per_sec;
+#else
 #define sys_clock_hw_cycles_per_sec CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC
+#endif
 
 /*
  * sys_clock_us_per_tick global variable represents a number
@@ -81,7 +90,7 @@ extern int sys_clock_hw_cycles_per_tick;
 
 #define SYS_CLOCK_HW_CYCLES_TO_NS(X) (uint32_t)(SYS_CLOCK_HW_CYCLES_TO_NS64(X))
 
-extern int64_t _nano_ticks;
+extern int64_t _sys_clock_tick_count;
 extern struct nano_timer *_nano_timer_list;
 
 /*
@@ -93,5 +102,9 @@ extern struct nano_timer *_nano_timer_list;
 #define MSEC(x)    (SECONDS(x) / 1000)
 
 #endif /* !_ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _SYS_CLOCK__H_ */

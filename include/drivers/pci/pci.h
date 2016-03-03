@@ -1,5 +1,3 @@
-/* pci.h - PCI probe and information routines */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,13 +14,19 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Module declares routines of PCI bus initialization and query
+/**
+ * @file
+ * @brief PCI probe and information routines
+ *
+ * Module declares routines of PCI bus initialization and query
  */
 
 #ifndef _PCI_H_
 #define _PCI_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define BAR_SPACE_MEM 0
 #define BAR_SPACE_IO 1
@@ -44,7 +48,7 @@ struct pci_dev_info {
 	uint32_t dev:5;
 	uint32_t function:4;
 	uint32_t mem_type:1; /* memory type: BAR_SPACE_MEM/BAR_SPACE_IO */
-	uint32_t class:8;
+	uint32_t class_type:8;
 	uint32_t bar:3;
 	uint32_t _reserved:3;
 
@@ -56,7 +60,7 @@ struct pci_dev_info {
 extern void pci_bus_scan_init(void);
 extern int pci_bus_scan(struct pci_dev_info *dev_info);
 #else
-#define pci_bus_scan_init(void) {;}
+#define pci_bus_scan_init(void) { ; }
 static inline int pci_bus_scan(struct pci_dev_info *dev_info)
 {
 	return 1;
@@ -64,7 +68,7 @@ static inline int pci_bus_scan(struct pci_dev_info *dev_info)
 #endif /* CONFIG_PCI_ENUMERATION */
 
 void pci_enable_regs(struct pci_dev_info *dev_info);
-void pci_enable_master(struct pci_dev_info *dev_info);
+void pci_enable_bus_master(struct pci_dev_info *dev_info);
 int pci_legacy_bridge_detect(struct pci_dev_info *dev_info);
 void pci_legacy_bridge_configure(struct pci_dev_info *dev_info,
 				 int io_block_num,
@@ -74,7 +78,11 @@ void pci_legacy_bridge_configure(struct pci_dev_info *dev_info,
 #ifdef CONFIG_PCI_DEBUG
 extern void pci_show(struct pci_dev_info *dev_info);
 #else
-#define pci_show(__unused__) {;}
+#define pci_show(__unused__) { ; }
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* _PCI_H_ */

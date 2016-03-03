@@ -1,5 +1,3 @@
-/* nvic.c - ARM CORTEX-M Series Nested Vector Interrupt Controller */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,28 +14,34 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Provide an interface to the Nested Vectored Interrupt Controller found on
-ARM Cortex-M processors.
-
-The API does not account for all possible usages of the NVIC, only the
-functionalities needed by the kernel.
-
-The same effect can be achieved by directly writing in the registers of the
-NVIC, with the layout available from scs.h, using the __scs.nvic data
-structure (or hardcoded values), but these APIs are less error-prone,
-especially for registers with multiple instances to account for potentially
-240 interrupt lines. If access to a missing functionality is needed, this is
-the way to implement it.
-
-Supports up to 240 IRQs and 256 priority levels.
+/**
+ * @file
+ * @brief Nvic.c - ARM CORTEX-M Series Nested Vector Interrupt Controller
+ *
+ * Provide an interface to the Nested Vectored Interrupt Controller found on
+ * ARM Cortex-M processors.
+ *
+ * The API does not account for all possible usages of the NVIC, only the
+ * functionalities needed by the kernel.
+ *
+ * The same effect can be achieved by directly writing in the registers of the
+ * NVIC, with the layout available from scs.h, using the __scs.nvic data
+ * structure (or hardcoded values), but these APIs are less error-prone,
+ * especially for registers with multiple instances to account for potentially
+ * 240 interrupt lines. If access to a missing functionality is needed, this is
+ * the way to implement it.
+ *
+ * Supports up to 240 IRQs and 256 priority levels.
  */
 
 #ifndef _NVIC_H_
 #define _NVIC_H_
 
 #include <arch/arm/cortex_m/scs.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* for assembler, only works with constants */
 #define _EXC_PRIO(pri) (((pri) << (8 - CONFIG_NUM_IRQ_PRIO_BITS)) & 0xff)
@@ -213,7 +217,7 @@ static inline uint32_t _NvicIrqPrioGet(unsigned int irq)
 
 static inline void _NvicSwInterruptTrigger(unsigned int irq)
 {
-#if defined(CONFIG_PLATFORM_TI_LM3S6965_QEMU)
+#if defined(CONFIG_SOC_TI_LM3S6965_QEMU)
 	/* the QEMU does not simulate the STIR register: this is a workaround */
 	_NvicIrqPend(irq);
 #else
@@ -222,5 +226,9 @@ static inline void _NvicSwInterruptTrigger(unsigned int irq)
 }
 
 #endif /* !_ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _NVIC_H_ */

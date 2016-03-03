@@ -1,5 +1,3 @@
-/* linker-defs-arch.h - Intel commonly used macro and defines for linker script */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,9 +14,11 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Commonly used macros and defines for linker script.
+/**
+ * @file
+ * @brief Intel commonly used macro and defines for linker script
+ *
+ * Commonly used macros and defines for linker script.
  */
 #ifndef _LINKERDEFSARCH_H
 #define _LINKERDEFSARCH_H
@@ -38,21 +38,20 @@ Commonly used macros and defines for linker script.
 	#define IRQ_TO_INTERRUPT_VECTOR KEEP(*(irq_int_vector_map))
 #else
 	/*
-	 * Save space for the real IDT to prevent symbols from shifting. Note that
-	 * an IDT entry is 8 bytes in size.
+	 * Save space for the real IDT to prevent symbols from shifting. Note
+	 * that an IDT entry is 8 bytes in size.
 	 */
 	#define STATIC_IDT . += (8 * CONFIG_IDT_NUM_VECTORS);
 
 	/*
-	 * Save space for the real _interrupt_vectors_allocated[] array to prevent
-	 * symbols from shifting.
+	 * Save space for the real _interrupt_vectors_allocated[] array to
+	 * prevent symbols from shifting.
 	 */
 	#define INTERRUPT_VECTORS_ALLOCATED . += ((CONFIG_IDT_NUM_VECTORS + 31) / 32);
 	/*
 	 * Both IRQs and interrupt vectors may be in the range of 0..255 inclusive.
-	 * Save 256 bytes for the IRQ to interrupt vector mapping.
 	 */
-	#define IRQ_TO_INTERRUPT_VECTOR . += 256;
+	#define IRQ_TO_INTERRUPT_VECTOR . += CONFIG_MAX_IRQ_LINES;
 #endif
 
 /*

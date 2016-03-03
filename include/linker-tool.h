@@ -1,5 +1,3 @@
-/* linker-tool.h - toolchain-agnostic linker defs */
-
 /*
  * Copyright (c) 2013-2014, Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This header file is used to automatically select the proper set of macro
-definitions (based on the toolchain) for the linker script.
+/**
+ * @file
+ * @brief Toolchain-agnostic linker defs
+ *
+ * This header file is used to automatically select the proper set of macro
+ * definitions (based on the toolchain) for the linker script.
  */
 
 #ifndef __LINKER_TOOL_H
@@ -28,8 +28,6 @@ definitions (based on the toolchain) for the linker script.
 #if defined(_LINKER)
 #if defined(__GCC_LINKER_CMD__)
 #include <linker-tool-gcc.h>
-#elif defined(__DIAB_LINKER_CMD__)
-#include <linker-tool-diab.h>
 #else
 #error "Unknown toolchain"
 #endif

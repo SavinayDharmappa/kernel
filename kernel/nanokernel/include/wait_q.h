@@ -21,6 +21,10 @@
 
 #include <nano_private.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* reset a wait queue, call during operation */
 static inline void _nano_wait_q_reset(struct _nano_queue *wait_q)
 {
@@ -50,7 +54,7 @@ struct tcs *_nano_wait_q_remove_no_check(struct _nano_queue *wait_q)
 	}
 	tcs->link = 0;
 
-	_nano_fiber_schedule(tcs);
+	_nano_fiber_ready(tcs);
 	return tcs;
 }
 
@@ -94,10 +98,29 @@ static inline void _nano_timeout_remove_tcs_from_wait_q(struct tcs *tcs)
 	}
 }
 #include <timeout_q.h>
+
+	#define _NANO_TIMEOUT_TICK_GET()  sys_tick_get()
+
+	#define _NANO_TIMEOUT_ADD(pq, ticks)                                 \
+		do {                                                             \
+			if ((ticks) != TICKS_UNLIMITED) {                            \
+				_nano_timeout_add(_nanokernel.current, (pq), (ticks));   \
+			}                                                            \
+		} while (0)
+	#define _NANO_TIMEOUT_SET_TASK_TIMEOUT(ticks) \
+		_nanokernel.task_timeout = (ticks)
 #else
 	#define _nano_timeout_tcs_init(tcs) do { } while ((0))
 	#define _nano_timeout_abort(tcs) do { } while ((0))
 	#define _nano_get_earliest_timeouts_deadline() ((uint32_t)TICKS_UNLIMITED)
+
+	#define _NANO_TIMEOUT_TICK_GET()  0
+	#define _NANO_TIMEOUT_ADD(pq, ticks) do { } while (0)
+	#define _NANO_TIMEOUT_SET_TASK_TIMEOUT(ticks) do { } while ((0))
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* _kernel_nanokernel_include_wait_q__h_ */

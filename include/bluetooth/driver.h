@@ -20,20 +20,34 @@
 #ifndef __BT_DRIVER_H
 #define __BT_DRIVER_H
 
-#include <bluetooth/buf.h>
+#include <net/buf.h>
+
+enum bt_buf_type {
+	BT_CMD,			/** HCI command */
+	BT_EVT,			/** HCI event */
+	BT_ACL_OUT,		/** Outgoing ACL data */
+	BT_ACL_IN,		/** Incoming ACL data */
+};
+
+/* Allocate a buffer for an HCI event */
+struct net_buf *bt_buf_get_evt(void);
+
+/* Allocate a buffer for incoming ACL data */
+struct net_buf *bt_buf_get_acl(void);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Receive data from the controller/HCI driver */
-void bt_recv(struct bt_buf *buf);
+void bt_recv(struct net_buf *buf);
 
 struct bt_driver {
-	/* How much headroom is needed for HCI transport headers */
-	size_t head_reserve;
-
 	/* Open the HCI transport */
 	int (*open)(void);
 
-	/* Send data to HCI */
-	int (*send)(struct bt_buf *buf);
+	/* Send buffer command to controller */
+	int (*send)(enum bt_buf_type type, struct net_buf *buf);
 };
 
 /* Register a new HCI driver to the Bluetooth stack */
@@ -41,5 +55,9 @@ int bt_driver_register(struct bt_driver *drv);
 
 /* Unregister a previously registered HCI driver */
 void bt_driver_unregister(struct bt_driver *drv);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __BT_DRIVER_H */

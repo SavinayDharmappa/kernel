@@ -1,5 +1,3 @@
-/* k_idle.c - microkernel idle logic */
-
 /*
  * Copyright (c) 1997-2010, 2012-2014 Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-Microkernel idle logic. Different forms of idling are performed by the idle
-task, depending on how the kernel is configured.
+/**
+ * @file
+ * @brief Microkernel idle logic
+ *
+ * Microkernel idle logic. Different forms of idling are performed by the idle
+ * task, depending on how the kernel is configured.
  */
 
 #include <micro_private.h>
@@ -72,6 +72,7 @@ static void workload_loop(void)
 
 	while (++_k_workload_i != _k_workload_n1) {
 		unsigned int s_iCountDummyProc = 0;
+
 		while (64 != s_iCountDummyProc++) { /* 64 == 2^6 */
 			x >>= y;
 			x <<= y;
@@ -98,9 +99,9 @@ void _k_workload_monitor_calibrate(void)
 	_k_workload_n0 = _k_workload_i = 0;
 	_k_workload_n1 = 1000;
 
-	_k_workload_t0 = _sys_clock_cycle_get();
+	_k_workload_t0 = sys_cycle_get_32();
 	workload_loop();
-	_k_workload_t1 = _sys_clock_cycle_get();
+	_k_workload_t1 = sys_cycle_get_32();
 
 	_k_workload_delta = _k_workload_t1 - _k_workload_t0;
 	_k_workload_i0 = _k_workload_i;
@@ -129,7 +130,7 @@ void _k_workload_monitor_update(void)
 {
 	if (--_k_workload_ticks == 0) {
 		_k_workload_t0 = _k_workload_t1;
-		_k_workload_t1 = _sys_clock_cycle_get();
+		_k_workload_t1 = sys_cycle_get_32();
 		_k_workload_n0 = _k_workload_n1;
 		_k_workload_n1 = _k_workload_i - 1;
 		_k_workload_ticks = _k_workload_slice;
@@ -146,7 +147,7 @@ void _k_workload_monitor_update(void)
  */
 void _k_workload_monitor_idle_start(void)
 {
-	_k_workload_start_time = _sys_clock_cycle_get();
+	_k_workload_start_time = sys_cycle_get_32();
 }
 
 /**
@@ -160,7 +161,7 @@ void _k_workload_monitor_idle_start(void)
  */
 void _k_workload_monitor_idle_end(void)
 {
-	_k_workload_end_time = _sys_clock_cycle_get();
+	_k_workload_end_time = sys_cycle_get_32();
 	_k_workload_i += (_k_workload_i0 *
 		(_k_workload_end_time - _k_workload_start_time)) / _k_workload_delta;
 }
@@ -180,9 +181,9 @@ void _k_workload_get(struct k_args *P)
 
 	k = (_k_workload_i - _k_workload_n0) * _k_workload_ref_time;
 #ifdef WL_SCALE
-	t = (_sys_clock_cycle_get() - _k_workload_t0) >> (_k_workload_scale);
+	t = (sys_cycle_get_32() - _k_workload_t0) >> (_k_workload_scale);
 #else
-	t = (_sys_clock_cycle_get() - _k_workload_t0) >> (4 + 6);
+	t = (sys_cycle_get_32() - _k_workload_t0) >> (4 + 6);
 #endif
 
 	iret = MSEC_PER_SEC - k / t;
@@ -245,7 +246,6 @@ unsigned char _sys_power_save_flag = 1;
 #include <drivers/system_timer.h>
 #endif
 
-extern void nano_cpu_idle(void);
 extern void nano_cpu_set_idle(int32_t ticks);
 
 #if defined(CONFIG_TICKLESS_IDLE)
@@ -319,10 +319,6 @@ void _sys_power_save_idle_exit(int32_t ticks)
 #else
 	ARG_UNUSED(ticks);
 #endif /* CONFIG_TICKLESS_IDLE */
-#ifdef CONFIG_PROFILER_SLEEP
-	extern void _sys_profiler_exit_sleep(void);
-	_sys_profiler_exit_sleep();
-#endif
 }
 
 /**
@@ -360,8 +356,6 @@ static inline int32_t _get_next_timer_expiry(void)
  */
 static void _power_save(void)
 {
-	extern void nano_cpu_idle(void);
-
 	if (_sys_power_save_flag) {
 		for (;;) {
 			irq_lock();
@@ -369,9 +363,10 @@ static void _power_save(void)
 			_sys_power_save_idle(_get_next_timer_expiry());
 #else
 			/*
-			 * nano_cpu_idle() is invoked here directly only if APM is
-			 * disabled. Otherwise the microkernel decides either to invoke
-			 * it or to implement advanced idle functionality
+			 * nano_cpu_idle() is invoked here directly only if APM
+			 * is disabled. Otherwise the microkernel decides
+			 * either to invoke it or to implement advanced idle
+			 * functionality
 			 */
 
 			nano_cpu_idle();
@@ -412,6 +407,7 @@ int _k_kernel_idle(void)
 	/* record timestamp when idling begins */
 
 	extern uint64_t __idle_tsc;
+
 	__idle_tsc = _NanoTscRead();
 #endif
 
@@ -420,8 +416,8 @@ int _k_kernel_idle(void)
 	}
 
 	/*
-	 * Code analyzers may complain that _k_kernel_idle() uses an infinite loop
-	 * unless we indicate that this is intentional
+	 * Code analyzers may complain that _k_kernel_idle() uses an infinite
+	 * loop unless we indicate that this is intentional
 	 */
 
 	CODE_UNREACHABLE;

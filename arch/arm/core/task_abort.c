@@ -1,5 +1,3 @@
-/* task_abort.c - ARM Cortex-M _TaskAbort() routine */
-
 /*
  * Copyright (c) 2014 Wind River Systems, Inc.
  *
@@ -16,14 +14,16 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-The ARM Cortex-M architecture provides its own _TaskAbort() to deal with
-different CPU modes (handler vs thread) when a task aborts. When its entry
-point returns or when it aborts itself, the CPU is in thread mode and must
-call the equivalent of task_abort(<self>), but when in handler mode, the
-CPU must queue a packet to _k_server(), then exit handler mode to queue the
-PendSV exception and cause the immediate context switch to _k_server.
+/**
+ * @file
+ * @brief ARM Cortex-M _TaskAbort() routine
+ *
+ * The ARM Cortex-M architecture provides its own _TaskAbort() to deal with
+ * different CPU modes (handler vs thread) when a task aborts. When its entry
+ * point returns or when it aborts itself, the CPU is in thread mode and must
+ * call the equivalent of task_abort(<self>), but when in handler mode, the
+ * CPU must queue a packet to _k_server(), then exit handler mode to queue the
+ * PendSV exception and cause the immediate context switch to _k_server.
  */
 
 #ifdef CONFIG_MICROKERNEL
@@ -49,10 +49,7 @@ static struct k_args cmd_packet;
  * - the task encounters a fatal exception
  *
  * @return N/A
- *
- * \NOMANUAL
  */
-
 void _TaskAbort(void)
 {
 	const int taskAbortCode = 1;

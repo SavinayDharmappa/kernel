@@ -28,7 +28,6 @@
  *
  * @return N/A
  */
-
 void _k_pipe_get_request(struct k_args *RequestOrig)
 {
 	struct k_args *Request;
@@ -45,8 +44,8 @@ void _k_pipe_get_request(struct k_args *RequestOrig)
 	mycopypacket(&Request, RequestOrig);
 
 	/* Now, we need a new packet for processing of the request;
-	   the Request package is too small b/c of space lost due to possible
-	   embedded local data
+	 * the Request package is too small b/c of space lost due to possible
+	 * embedded local data
 	 */
 
 	mycopypacket(&RequestProc, Request);
@@ -97,11 +96,12 @@ void _k_pipe_get_request(struct k_args *RequestOrig)
 
 		iData2ReadFromWriters = CalcAvailWriterData(pipe_ptr->writers);
 		iAvailBufferData =
-			pipe_ptr->desc.available_data_count + pipe_ptr->desc.available_data_post_wrap_around;
+			pipe_ptr->desc.available_data_count +
+			pipe_ptr->desc.available_data_post_wrap_around;
 		iTotalData2Read =
 			iAvailBufferData + iData2ReadFromWriters;
 
-		if (0 == iTotalData2Read)
+		if (iTotalData2Read == 0)
 			break; /* special case b/c even not good enough for 1_TO_N */
 
 		/* (possibly) do some processing */
@@ -132,42 +132,41 @@ void _k_pipe_get_request(struct k_args *RequestOrig)
 		 * is only useful to the finite timeout case.
 		 */
 		RequestProc->Comm = _K_SVC_PIPE_GET_TIMEOUT;
-		if (_TIME_B == _k_pipe_time_type_get(&RequestProc->args)) {
+		if (_k_pipe_time_type_get(&RequestProc->args) == _TIME_B) {
 			/*
 			 * The writer specified TICKS_UNLIMITED, so NULL the timer.
 			 */
 			RequestProc->Time.timer = NULL;
 			return;
-		} else {
-			/* { TIME_BT } */
+		}
+
+		/* { TIME_BT } */
 #ifdef CANCEL_TIMERS
-			if (RequestProc->args.pipe_xfer_req.xferred_size != 0) {
-				RequestProc->Time.timer = NULL;
-			} else
+		if (RequestProc->args.pipe_xfer_req.xferred_size != 0) {
+			RequestProc->Time.timer = NULL;
+		} else
 #endif
-				/* enlist a new timer into the timeout chain */
-				_k_timeout_alloc(RequestProc);
+			/* enlist a new timer into the timeout chain */
+			_k_timeout_alloc(RequestProc);
 
-			return;
-		}
-	} else {
-		/* call is non-blocking;
-		   Check if we don't have to queue it b/c it could not
-		   be processed at once
-		 */
-		RequestProc->Time.timer = NULL;
-
-		if (XFER_BUSY == RequestProc->args.pipe_xfer_req.status) {
-			INSERT_ELM(pipe_ptr->readers, RequestProc);
-		} else {
-			__ASSERT_NO_MSG(XFER_IDLE ==
-				RequestProc->args.pipe_xfer_req.status);
-			__ASSERT_NO_MSG(0 == RequestProc->args.pipe_xfer_req.xferred_size);
-			RequestProc->Comm = _K_SVC_PIPE_GET_REPLY;
-			_k_pipe_get_reply(RequestProc);
-		}
 		return;
 	}
+
+	/* call is non-blocking;
+	 * Check if we don't have to queue it b/c it could not
+	 * be processed at once
+	 */
+	RequestProc->Time.timer = NULL;
+
+	if (RequestProc->args.pipe_xfer_req.status == XFER_BUSY) {
+		INSERT_ELM(pipe_ptr->readers, RequestProc);
+	} else {
+		__ASSERT_NO_MSG(RequestProc->args.pipe_xfer_req.status == XFER_IDLE);
+		__ASSERT_NO_MSG(RequestProc->args.pipe_xfer_req.xferred_size == 0);
+		RequestProc->Comm = _K_SVC_PIPE_GET_REPLY;
+		_k_pipe_get_reply(RequestProc);
+	}
+	return;
 }
 
 /**
@@ -176,7 +175,6 @@ void _k_pipe_get_request(struct k_args *RequestOrig)
  *
  * @return N/A
  */
-
 void _k_pipe_get_timeout(struct k_args *ReqProc)
 {
 	__ASSERT_NO_MSG(NULL != ReqProc->Time.timer);
@@ -185,7 +183,7 @@ void _k_pipe_get_timeout(struct k_args *ReqProc)
 	_k_pipe_request_status_set(&ReqProc->args.pipe_xfer_req, TERM_TMO);
 
 	DeListWaiter(ReqProc);
-	if (0 == ReqProc->args.pipe_xfer_req.num_pending_xfers) {
+	if (ReqProc->args.pipe_xfer_req.num_pending_xfers == 0) {
 		_k_pipe_get_reply(ReqProc);
 	}
 }
@@ -196,24 +194,24 @@ void _k_pipe_get_timeout(struct k_args *ReqProc)
  *
  * @return N/A
  */
-
 void _k_pipe_get_reply(struct k_args *ReqProc)
 {
 	__ASSERT_NO_MSG(
-		(0 == ReqProc->args.pipe_xfer_req.num_pending_xfers) /*  no pending Xfers */
-	    && (NULL == ReqProc->Time.timer) /*  no pending timer */
-	    && (NULL == ReqProc->head)); /*  not in list */
+		(ReqProc->args.pipe_xfer_req.num_pending_xfers == 0) /*  no pending Xfers */
+	    && (ReqProc->Time.timer == NULL) /*  no pending timer */
+	    && (ReqProc->head == NULL)); /*  not in list */
 
 	/* orig packet must be sent back, not ReqProc */
 
 	struct k_args *ReqOrig = ReqProc->Ctxt.args;
 	PIPE_REQUEST_STATUS status;
+
 	ReqOrig->Comm = _K_SVC_PIPE_GET_ACK;
 
 	/* determine return value */
 
 	status = ReqProc->args.pipe_xfer_req.status;
-	if (TERM_TMO == status) {
+	if (status == TERM_TMO) {
 		ReqOrig->Time.rcode = RC_TIME;
 	} else if ((TERM_XXX | XFER_IDLE) & status) {
 		K_PIPE_OPTION Option = _k_pipe_option_get(&ReqProc->args);
@@ -248,7 +246,6 @@ void _k_pipe_get_reply(struct k_args *ReqProc)
  *
  * @return N/A
  */
-
 void _k_pipe_get_ack(struct k_args *Request)
 {
 	struct k_args *LocalReq;

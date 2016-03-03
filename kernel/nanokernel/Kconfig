@@ -35,9 +35,9 @@ config INT_LATENCY_BENCHMARK
 	help
 	This option enables the tracking of interrupt latency metrics;
 	the exact set of metrics being tracked is platform-dependent.
-	Tracking begins when intLatencyInit() is invoked by an application.
+	Tracking begins when int_latency_init() is invoked by an application.
 	The metrics are displayed (and a new sampling interval is started)
-	each time intLatencyShow() is called thereafter.
+	each time int_latency_show() is called thereafter.
 
 config MAIN_STACK_SIZE
 	int
@@ -82,4 +82,21 @@ config  NANO_TIMERS
 	help
 	Allow fibers and tasks to wait on nanokernel timers, which can be
 	accessed using the nano_timer_xxx() APIs.
+
+config NANOKERNEL_TICKLESS_IDLE_SUPPORTED
+	bool
+	default n
+	help
+	To be selected by an architecture if it does support tickless idle in
+	nanokernel systems.
+
+config ERRNO
+	bool
+	prompt "Enable errno support"
+	default y
+	help
+	Enable per-thread errno in the kernel. Application and library code must
+	include errno.h provided by the C library (libc) to use the errno symbol.
+	The C library must access the per-thread errno via the _get_errno() symbol.
+
 endmenu

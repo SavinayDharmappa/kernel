@@ -1,5 +1,3 @@
-/* ARM Cortex-M systick handler stub for GDB debugging */
-
 /*
  * Copyright (c) 2014-2015 Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-GDB stub needed before the real systick handler runs to be able to display the
-correct state of the thread that was interrupted.
+/**
+ * @file
+ * @brief ARM Cortex-M systick handler stub for GDB debugging
+ *
+ * GDB stub needed before the real systick handler runs to be able to display the
+ * correct state of the thread that was interrupted.
  */
 
 #define _ASMLANGUAGE
@@ -36,11 +36,4 @@ SECTION_FUNC(TEXT, _timer_int_handler)
 
     _GDB_STUB_EXC_ENTRY
 
-#if defined(CONFIG_ARM_DEBUG_ESF)
-	push {lr}
-	bl _real_timer_int_handler
-	pop {lr}
-	b _ExcExit
-#else
     b _real_timer_int_handler
-#endif

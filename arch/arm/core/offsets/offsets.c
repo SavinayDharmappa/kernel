@@ -1,5 +1,3 @@
-/* offsets.c - ARM nano kernel structure member offset definition file */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,22 +14,23 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This module is responsible for the generation of the absolute symbols whose
-value represents the member offsets for various ARM nanokernel
-structures.
-
-All of the absolute symbols defined by this module will be present in the
-final microkernel or nanokernel ELF image (due to the linker's reference to
-the _OffsetAbsSyms symbol).
-
-INTERNAL
-It is NOT necessary to define the offset for every member of a structure.
-Typically, only those members that are accessed by assembly language routines
-are defined; however, it doesn't hurt to define all fields for the sake of
-completeness.
-
+/**
+ * @file
+ * @brief ARM nano kernel structure member offset definition file
+ *
+ * This module is responsible for the generation of the absolute symbols whose
+ * value represents the member offsets for various ARM nanokernel
+ * structures.
+ *
+ * All of the absolute symbols defined by this module will be present in the
+ * final microkernel or nanokernel ELF image (due to the linker's reference to
+ * the _OffsetAbsSyms symbol).
+ *
+ * INTERNAL
+ * It is NOT necessary to define the offset for every member of a structure.
+ * Typically, only those members that are accessed by assembly language routines
+ * are defined; however, it doesn't hurt to define all fields for the sake of
+ * completeness.
  */
 
 #include <gen_offset.h>
@@ -44,9 +43,6 @@ GEN_OFFSET_SYM(tNANO, flags);
 #ifdef CONFIG_ADVANCED_POWER_MANAGEMENT
 GEN_OFFSET_SYM(tNANO, idle);
 #endif /* CONFIG_ADVANCED_POWER_MANAGEMENT */
-#if defined(CONFIG_ARM_DEBUG_ESF)
-GEN_OFFSET_SYM(tNANO, isf);
-#endif
 
 /* ARM-specific struct tcs structure member offsets */
 

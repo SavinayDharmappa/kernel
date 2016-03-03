@@ -21,6 +21,10 @@
 #ifndef _ASM_INLINE_GCC_PUBLIC_GCC_H
 #define _ASM_INLINE_GCC_PUBLIC_GCC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * The file must not be included directly
  * Include arch/cpu.h instead
@@ -28,7 +32,6 @@
 
 #ifdef _ASMLANGUAGE
 
-#include <arch/arm/cortex_m/scs.h>
 #define _SCS_BASE_ADDR _PPB_INT_SCS
 #define _SCS_ICSR (_SCS_BASE_ADDR + 0xd04)
 #define _SCS_ICSR_PENDSV (1 << 28)
@@ -171,4 +174,9 @@ static ALWAYS_INLINE void irq_unlock(unsigned int key)
 
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ASM_INLINE_GCC_PUBLIC_GCC_H */

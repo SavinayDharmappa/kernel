@@ -198,8 +198,8 @@ static	void _rlrshift(uint32_t value[])
 }
 
  /*
-    64 bit divide by 5 function for _to_float.
-    The result is ROUNDED, not TRUNCATED.
+  * 64 bit divide by 5 function for _to_float.
+  * The result is ROUNDED, not TRUNCATED.
   */
 
 static	void _ldiv5(uint32_t value[])
@@ -533,10 +533,12 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 
 	while ((c = *format++)) {
 		if (c != '%') {
-			if ((*func) (c, dest) == EOF)
+			if ((*func) (c, dest) == EOF) {
 				return EOF;
-			else
-				count++;
+			}
+
+			count++;
+
 		} else {
 			fminus = fplus = fspace = falt = false;
 			pad = ' ';		/* Default pad character    */
@@ -740,10 +742,11 @@ int _prf(int (*func)(), void *dest, char *format, va_list vargs)
 				break;
 
 			case '%':
-				if ((*func)('%', dest) == EOF)
+				if ((*func)('%', dest) == EOF) {
 					return EOF;
-				else
-					count++;
+				}
+
+				count++;
 				break;
 
 			case 0:

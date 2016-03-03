@@ -18,8 +18,19 @@
 #ifndef __INCLUDE_PINMUX_H
 #define __INCLUDE_PINMUX_H
 
+/**
+ * @brief Pinmux Interface
+ * @defgroup pinmux_interface Pinmux Interface
+ * @ingroup io_interfaces
+ * @{
+ */
+
 #include <stdint.h>
 #include <device.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define PINMUX_NAME		"pinmux"
 
@@ -28,18 +39,36 @@
 #define PINMUX_FUNC_C		2
 #define PINMUX_FUNC_D		3
 
-typedef uint32_t (*pmux_set)(struct device *dev, uint32_t pin, uint8_t func);
-typedef uint32_t (*pmux_get)(struct device *dev, uint32_t pin, uint8_t *func);
+#define PINMUX_PULLUP_ENABLE	(0x1)
+#define PINMUX_PULLUP_DISABLE	(0x0)
+
+#define PINMUX_INPUT_ENABLED	(0x1)
+#define PINMUX_OUTPUT_ENABLED	(0x0)
+
+typedef uint32_t (*pmux_set)(struct device *dev, uint32_t pin, uint32_t func);
+typedef uint32_t (*pmux_get)(struct device *dev, uint32_t pin, uint32_t *func);
+typedef uint32_t (*pmux_pullup)(struct device *dev, uint32_t pin, uint8_t func);
+typedef uint32_t (*pmux_input)(struct device *dev, uint32_t pin, uint8_t func);
 
 struct pinmux_driver_api {
 	pmux_set set;
 	pmux_get get;
+	pmux_pullup pullup;
+	pmux_input input;
 };
 
 
-static inline uint32_t pinmux_set_pin(struct device *dev,
+/**
+ * @brief Set the functionality of a pin
+ * @param dev Pointer to the device structure for the driver instance
+ * @param pin Pin identifier
+ * @param func Platform-specific 32-bit value describing the pin configuration.
+ *
+ * @return DEV_OK if successful, another DEV_* code otherwise.
+ */
+static inline uint32_t pinmux_pin_set(struct device *dev,
 				      uint32_t pin,
-				      uint8_t func)
+				      uint32_t func)
 {
 	struct pinmux_driver_api *api;
 
@@ -47,14 +76,52 @@ static inline uint32_t pinmux_set_pin(struct device *dev,
 	return api->set(dev, pin, func);
 }
 
-static inline uint32_t pinmux_get_pin(struct device *dev,
+/**
+ * @brief Get the functionality of a pin
+ * @param dev Pointer to the device structure for the driver instance
+ * @param pin Pin identifier
+ * @param func Pointer to a platform-specific 32-bit value describing the
+ *             pin configuration.
+ *
+ * @return DEV_OK if successful, another DEV_* code otherwise.
+ */
+static inline uint32_t pinmux_pin_get(struct device *dev,
 				      uint32_t pin,
-				      uint8_t *func)
+				      uint32_t *func)
 {
 	struct pinmux_driver_api *api;
 
 	api = (struct pinmux_driver_api *) dev->driver_api;
 	return api->get(dev, pin, func);
 }
+
+static inline uint32_t pinmux_pin_pullup(struct device *dev,
+					 uint32_t pin,
+					 uint8_t func)
+{
+	struct pinmux_driver_api *api;
+
+	api = (struct pinmux_driver_api *) dev->driver_api;
+	return api->pullup(dev, pin, func);
+}
+
+static inline uint32_t pinmux_pin_input_enable(struct device *dev,
+					       uint32_t pin,
+					       uint8_t func)
+{
+	struct pinmux_driver_api *api;
+
+	api = (struct pinmux_driver_api *) dev->driver_api;
+	return api->input(dev, pin, func);
+}
+
+#ifdef __cplusplus
+}
+#endif
+
+/**
+ *
+ * @}
+ */
 
 #endif /* __INCLUDE_PINMUX_H */

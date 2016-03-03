@@ -20,7 +20,7 @@
 
 /**
  * @brief Microkernel Memory Maps
- * @defgroup microkernel_memorymap Microkernel Memomry Maps
+ * @defgroup microkernel_memorymap Microkernel Memory Maps
  * @ingroup microkernel_services
  * @{
  */
@@ -37,11 +37,10 @@ extern "C" {
 /**
  * @cond internal
  */
-extern int _task_mem_map_alloc(kmemory_map_t mmap, void **mptr, int32_t time);
 extern void _task_mem_map_free(kmemory_map_t mmap, void **mptr);
 
 /**
- * @brief Initialize a memory map struct.
+ * @brief Initialize a memory map struct
  *
  * @param blocks Number of blocks.
  * @param block_size Block Size (in bytes).
@@ -62,84 +61,61 @@ extern void _task_mem_map_free(kmemory_map_t mmap, void **mptr);
  *
  * This routine returns the number of blocks in use for the memory map.
  *
- * @param map Memory map.
+ * @param map Memory map name.
  *
- * @return number of used blocks
+ * @return Number of used blocks.
  */
 extern int task_mem_map_used_get(kmemory_map_t map);
 
 /**
- * @brief Return memory map block request
+ * @brief Return memory map block
  *
- * This routine returns a block to the specified memory map. If a higher
- * priority task is waiting for a block from the same map a task switch
- * takes place.
+ * This routine returns a block to the specified memory map.
  *
- * @param m Memory map.
- * @param p Block of memory to return.
+ * @param m Memory map name.
+ * @param p Memory block address.
  *
  * @return N/A
  */
 #define task_mem_map_free(m, p) _task_mem_map_free(m, p)
 
 /**
- * @brief Allocate memory map block request
+ * @brief Allocate memory map block
  *
- * This routine is used to request a block of memory from the memory map.
+ * This routine allocates a block from memory map @a mmap, and saves the
+ * block's address in the area indicated by @a mptr. If no block is available
+ * the routine waits until either one can be allocated, or until the specified
+ * time limit is reached.
  *
- * @param m Memory map from which to request block.
- * @param p Pointer to requested block of memory.
+ * @param mmap Memory map name.
+ * @param mptr Pointer to memory block address area.
+ * @param timeout Affects the action taken should the memory map be exhausted.
+ * If TICKS_NONE, then return immediately. If TICKS_UNLIMITED, then wait as
+ * long as necessary. Otherwise wait up to the specified number of ticks before
+ * timing out.
  *
- * @return RC_OK on success or RC_FAIL on error.
+ * @retval RC_OK Successfully allocated memory block.
+ * @retval RC_TIME Timed out while waiting for memory block.
+ * @retval RC_FAIL Failed to immediately allocate memory block when
+ * @a timeout = TICKS_NONE
  */
-#define task_mem_map_alloc(m, p) _task_mem_map_alloc(m, p, TICKS_NONE)
-
-/**
- * @brief Allocate memory map block request
- *
- * This routine is used to request a block of memory from the memory map.
- * The task will wait if the memory block is not available.
- *
- * @param m Memory map from which to request block.
- * @param p Pointer to requested block of memory.
- *
- * @return RC_OK on success or RC_FAIL on error.
- */
-#define task_mem_map_alloc_wait(m, p) _task_mem_map_alloc(m, p, TICKS_UNLIMITED)
-
-#ifdef CONFIG_SYS_CLOCK_EXISTS
-
-/**
- * @brief Allocate memory map block request with timeout
- *
- * This routine is used to request a block of memory from the memory map.
- * The task will wait if the memory block is not available until the timeout
- * expire or the memory is available.
- *
- * @param m Memory map from which to request block.
- * @param p Pointer to requested block of memory.
- * @param t Maximum number of ticks for which to wait.
- *
- * @return RC_OK, RC_FAIL, RC_TIME on success, error, timeout respectively
- */
-#define task_mem_map_alloc_wait_timeout(m, p, t) _task_mem_map_alloc(m, p, t)
-#endif
+extern int task_mem_map_alloc(kmemory_map_t mmap, void **mptr, int32_t timeout);
 
 /**
  * @brief Define a private microkernel memory map.
  *
- * @param name Name of the memory map.
- * @param blocks Number of blocks.
- * @param block_size Size of each blocks (in bytes).
+ * @param name       Memory map name.
+ * @param blocks     Number of blocks.
+ * @param block_size Size of each block, in bytes.
  */
 #define DEFINE_MEM_MAP(name, blocks, block_size) \
-       char __noinit __mem_map_buffer_##name[(blocks * block_size)]; \
-       struct _k_mem_map_struct _k_mem_map_obj_##name = \
-               __K_MEM_MAP_INITIALIZER(blocks, block_size, \
-				       __mem_map_buffer_##name); \
-       const kmemory_map_t name \
-               __section(_k_mem_map_ptr, private, mem_map) = \
-               (kmemory_map_t)&_k_mem_map_obj_##name;
+	char __noinit __mem_map_buffer_##name[(blocks * block_size)]; \
+	struct _k_mem_map_struct _k_mem_map_obj_##name = \
+		__K_MEM_MAP_INITIALIZER(blocks, block_size, \
+		__mem_map_buffer_##name); \
+	const kmemory_map_t name \
+		__in_section(_k_mem_map_ptr, private, mem_map) = \
+		(kmemory_map_t)&_k_mem_map_obj_##name;
 
 #ifdef __cplusplus
 }

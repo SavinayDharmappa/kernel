@@ -29,6 +29,10 @@
 #include <arch/x86/addr_types.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* APIs need to support non-byte addressable architectures */
 
 #define OCTET_TO_SIZEOFUNIT(X) (X)
@@ -40,25 +44,50 @@
  */
 #define MK_ISR_NAME(x) __isr__##x
 
+#ifdef CONFIG_MICROKERNEL
+#define ALL_DYN_IRQ_STUBS (CONFIG_NUM_DYNAMIC_STUBS + CONFIG_MAX_NUM_TASK_IRQS)
+#elif defined(CONFIG_NANOKERNEL)
+#define ALL_DYN_IRQ_STUBS (CONFIG_NUM_DYNAMIC_STUBS)
+#endif
+
+#define ALL_DYN_EXC_STUBS (CONFIG_NUM_DYNAMIC_EXC_STUBS + \
+			   CONFIG_NUM_DYNAMIC_EXC_NOERR_STUBS)
+
+#define ALL_DYN_STUBS (ALL_DYN_EXC_STUBS + ALL_DYN_IRQ_STUBS)
+
+
+
+/*
+ * Synchronize these DYN_STUB_* macros with the generated assembly for
+ * _DynIntStubsBegin in intstub.S / _DynExcStubsBegin in excstub.S
+ * Assumes all stub types are same size/format
+ */
+
+/* Size of each dynamic interrupt/exception stub in bytes */
+#ifdef CONFIG_X86_IAMCU
+#define DYN_STUB_SIZE		8
+#else
+#define DYN_STUB_SIZE		9
+#endif
+
+/*
+ * Offset from the beginning of a stub to the byte containing the argument
+ * to the push instruction, which is the stub index
+ */
+#define DYN_STUB_IDX_OFFSET	6
+
+/* Size of the periodic jmp instruction to the common handler */
+#define DYN_STUB_JMP_SIZE	5
+
+/*
+ * How many consecutive stubs we have until we encounter a periodic
+ * jump to _DynStubCommon
+ */
+#define DYN_STUB_PER_BLOCK	8
+
 #ifndef _ASMLANGUAGE
 
 /* interrupt/exception/error related definitions */
-
-#define _INT_STUB_SIZE		0x2b
-/**
- * Performance optimization
- *
- * Macro PERF_OPT is defined if project is compiled with option other than
- * size optimization ("-Os" for GCC, "-XO -Xsize-opt" for Diab). If the
- * last of the compiler options is the size optimization, PERF_OPT is not
- * defined and the project is optimized for size, hence the stub should be
- * aligned to 1 and not 16.
- */
-#ifdef PERF_OPT
-#define _INT_STUB_ALIGN	16
-#else
-#define _INT_STUB_ALIGN	1
-#endif
 
 /**
  * Floating point register set alignment.
@@ -83,8 +112,6 @@
 
 #define STACK_ALIGN  FP_REG_SET_ALIGN
 
-typedef unsigned char __aligned(_INT_STUB_ALIGN) NANO_INT_STUB[_INT_STUB_SIZE];
-
 typedef struct s_isrList {
 	/** Address of ISR/stub */
 	void		*fnc;
@@ -97,6 +124,7 @@ typedef struct s_isrList {
 	/** Privilege level associated with ISR/stub */
 	unsigned int    dpl;
 } ISR_LIST;
+
 
 /**
  * @brief Connect a routine to an interrupt vector
@@ -127,64 +155,140 @@ typedef struct s_isrList {
 	 ISR_LIST __attribute__((section(".intList"))) MK_ISR_NAME(r) = \
 			{&r, n, p, v, d}
 
-/*
- * @brief Declare a dynamic interrupt stub
- *
- * Macro to declare a dynamic interrupt stub. Using the macro places the stub
- * in the .intStubSection which is located in the image according to the kernel
- * configuration.
- * @param s Stub to be declared
- */
-#define NANO_CPU_INT_STUB_DECL(s) \
-	_NODATA_SECTION(.intStubSect) NANO_INT_STUB(s)
-
 
 /**
- * @brief Connect a routine to interrupt number
+ * Inline assembly code for the interrupt stub
  *
- * For the device @a device associates IRQ number @a irq with priority
- * @a priority with the interrupt routine @a isr, that receives parameter
- * @a parameter.
+ * This is the actual assembly code which gets run when the interrupt
+ * is triggered. Due to different calling convention semantics we have
+ * different versions for IAMCU and SYSV.
  *
- * @param device Device
- * @param irq IRQ number
- * @param priority IRQ Priority (currently ignored)
- * @param isr Interrupt Service Routine
- * @param parameter ISR parameter
+ * For IAMCU case, we call _execute_handler() with the isr and its argument
+ * as parameters.
  *
- * @return N/A
+ * For SysV case, we first call _IntEnt to properly enter Zephyr's interrupt
+ * handling context, and then directly call the isr. A jump is done to
+ * _IntExitWithEoi which does EOI to the interrupt controller, restores
+ * context, and finally does 'iret'.
  *
+ * This is only intended to be used by the IRQ_CONNECT() macro.
  */
-#define IRQ_CONNECT_STATIC(device, irq, priority, isr, parameter)	   \
-	extern void *_##device##_##isr##_stub;				               \
-	NANO_CPU_INT_REGISTER(_##device##_##isr##_stub, (irq), (priority), -1, 0)
+#if CONFIG_X86_IAMCU
+#define _IRQ_STUB_ASM \
+	"pushl %%eax\n\t" \
+	"pushl %%edx\n\t" \
+	"pushl %%ecx\n\t" \
+	"movl %[isr], %%eax\n\t" \
+	"movl %[isr_param], %%edx\n\t" \
+	"call _execute_handler\n\t" \
+	"popl %%ecx\n\t" \
+	"popl %%edx\n\t" \
+	"popl %%eax\n\t" \
+	"iret\n\t"
+#else
+#define _IRQ_STUB_ASM \
+	"call _IntEnt\n\t" \
+	"pushl %[isr_param]\n\t" \
+	"call %P[isr]\n\t" \
+	"jmp _IntExitWithEoi\n\t"
+#endif /* CONFIG_X86_IAMCU */
 
+/**
+ * Code snippets for populating the vector ID and priority into the intList
+ *
+ * The 'magic' of static interrupts is accomplished by building up an array
+ * 'intList' at compile time, and the gen_idt tool uses this to create the
+ * actual IDT data structure.
+ *
+ * For controllers like APIC, the vectors in the IDT are not normally assigned
+ * at build time; instead the sentinel value -1 is saved, and gen_idt figures
+ * out the right vector to use based on our priority scheme. Groups of 16
+ * vectors starting at 32 correspond to each priority level.
+ *
+ * On MVIC, the mapping is fixed; the vector to use is just the irq line
+ * number plus 0x20. The priority argument supplied by the user is discarded.
+ *
+ * These macros are only intended to be used by IRQ_CONNECT() macro.
+ */
+#if CONFIG_MVIC
+#define _PRIORITY_ARG(irq_p, priority_p)	((irq_p + 0x20) / 16)
+#define _VECTOR_ARG(irq_p)			(irq_p + 0x20)
+#else
+#define _PRIORITY_ARG(irq_p, priority_p)	(priority_p)
+#define _VECTOR_ARG(irq_p)			(-1)
+#endif /* CONFIG_MVIC */
 
-extern unsigned char _irq_to_interrupt_vector[];
+/**
+ * Configure a static interrupt.
+ *
+ * All arguments must be computable by the compiler at build time; if this
+ * can't be done use irq_connect_dynamic() instead.
+ *
+ * Internally this function does a few things:
+ *
+ * 1. There is a block of inline assembly which is completely skipped over
+ * at runtime with an initial 'jmp' instruction.
+ *
+ * 2. There is a declaration of the interrupt parameters in the .intList
+ * section, used by gen_idt to create the IDT. This does the same thing
+ * as the NANO_CPU_INT_REGISTER() macro, but is done in assembly as we
+ * need to populate the .fnc member with the address of the assembly
+ * IRQ stub that we generate immediately afterwards.
+ *
+ * 3. The IRQ stub itself is declared. It doesn't get run in the context
+ * of the calling function due to the initial 'jmp' instruction at the
+ * beginning of the assembly block, but a pointer to it gets saved in the IDT.
+ *
+ * 4. _SysIntVecProgram() is called at runtime to set the mapping between
+ * the vector and the IRQ line.
+ *
+ * @param irq_p IRQ line number
+ * @param priority_p Interrupt priority
+ * @param isr_p Interrupt service routine
+ * @param isr_param_p ISR parameter
+ * @param flags_p IRQ triggering options
+ *
+ * @return The vector assigned to this interrupt
+ */
+#define IRQ_CONNECT(irq_p, priority_p, isr_p, isr_param_p, flags_p) \
+({ \
+	__asm__ __volatile__(							\
+		"jmp 2f\n\t" \
+		".pushsection .intList\n\t" \
+		".long 1f\n\t"			/* ISR_LIST.fnc */ \
+		".long %P[irq]\n\t"		/* ISR_LIST.irq */ \
+		".long %P[priority]\n\t"	/* ISR_LIST.priority */ \
+		".long %P[vector]\n\t"		/* ISR_LIST.vec */ \
+		".long 0\n\t"			/* ISR_LIST.dpl */ \
+		".popsection\n\t" \
+		"1:\n\t" \
+		_IRQ_STUB_ASM \
+		"2:\n\t" \
+		: \
+		: [isr] "i" (isr_p), \
+		  [isr_param] "i" (isr_param_p), \
+		  [priority] "i" _PRIORITY_ARG(irq_p, priority_p), \
+		  [vector] "i" _VECTOR_ARG(irq_p), \
+		  [irq] "i" (irq_p)); \
+	_SysIntVecProgram(_IRQ_TO_INTERRUPT_VECTOR(irq_p), (irq_p), (flags_p)); \
+	_IRQ_TO_INTERRUPT_VECTOR(irq_p); \
+})
+
+#ifdef CONFIG_MVIC
+/* Fixed vector-to-irq association mapping.
+ * No need for the table at all.
+ */
+#define _IRQ_TO_INTERRUPT_VECTOR(irq) (irq + 0x20)
+#else
 /**
  * @brief Convert a statically connected IRQ to its interrupt vector number
  *
  * @param irq IRQ number
  */
+extern unsigned char _irq_to_interrupt_vector[];
 #define _IRQ_TO_INTERRUPT_VECTOR(irq)                       \
 			((unsigned int) _irq_to_interrupt_vector[irq])
-
-/**
- *
- * @brief Configure interrupt for the device
- *
- * For the given device do the necessary configuration steps.
- * For x86 platform configure APIC and mark interrupt vector allocated
- * @param device Device - not used by macro
- * @param irq IRQ
- *
- * @return N/A
- *
- */
-#define IRQ_CONFIG(device, irq)					\
-	do {							\
-		_SysIntVecProgram(_IRQ_TO_INTERRUPT_VECTOR(irq), irq); \
-	} while (0)
+#endif
 
 
 /**
@@ -207,8 +311,8 @@ typedef struct nanoEsf {
 	unsigned int esi;
 	unsigned int edi;
 	unsigned int edx;
-	unsigned int ecx;
 	unsigned int eax;
+	unsigned int ecx;
 	unsigned int errorCode;
 	unsigned int eip;
 	unsigned int cs;
@@ -225,6 +329,11 @@ typedef struct nanoEsf {
  *
  * The interrupt stack frame includes the volatile registers EAX, ECX, and EDX
  * pushed on the stack by _IntEnt().
+ *
+ * The host-based debug tools such as GDB do not require the 5 non-volatile
+ * registers (EDI, ESI, EBX, EBP and ESP) to be preserved during an interrupt.
+ * The register values saved/restored by _Swap() called from _IntExit() are
+ * sufficient.
  */
 
 typedef struct nanoIsf {
@@ -262,20 +371,17 @@ typedef struct nanoIsf {
 #define _NANO_ERR_STACK_CHK_FAIL	 (4)
 /** Kernel Allocation Failure */
 #define _NANO_ERR_ALLOCATION_FAIL    (5)
+/** Unhandled exception */
+#define _NANO_ERR_CPU_EXCEPTION		(6)
 
 #ifndef _ASMLANGUAGE
-
-
-#ifdef CONFIG_NO_ISRS
-
-static inline unsigned int irq_lock(void) {return 1;}
-static inline void irq_unlock(unsigned int key) {}
-
-#else /* CONFIG_NO_ISRS */
 
 #ifdef CONFIG_INT_LATENCY_BENCHMARK
 void _int_latency_start(void);
 void _int_latency_stop(void);
+#else
+#define _int_latency_start()  do { } while (0)
+#define _int_latency_stop()   do { } while (0)
 #endif
 
 /**
@@ -314,9 +420,7 @@ static inline __attribute__((always_inline)) unsigned int irq_lock(void)
 {
 	unsigned int key = _do_irq_lock();
 
-#ifdef CONFIG_INT_LATENCY_BENCHMARK
 	_int_latency_start();
-#endif
 
 	return key;
 }
@@ -341,20 +445,19 @@ static inline __attribute__((always_inline)) void irq_unlock(unsigned int key)
 	if (!(key & 0x200)) {
 		return;
 	}
-#ifdef CONFIG_INT_LATENCY_BENCHMARK
+
 	_int_latency_stop();
-#endif
+
 	_do_irq_unlock();
-	return;
 }
-#endif /* CONFIG_NO_ISRS */
 
 /** interrupt/exception/error related definitions */
 typedef void (*NANO_EOI_GET_FUNC) (void *);
 
 /**
  * The NANO_SOFT_IRQ macro must be used as the value for the @a irq parameter
- * to irq_connect() when connecting to a software generated interrupt.
+ * to NANO_CPU_INT_REGSITER when connecting to an interrupt that does not
+ * correspond to any IRQ line (such as spurious vector or SW IRQ)
  */
 #define NANO_SOFT_IRQ	((unsigned int) (-1))
 
@@ -369,10 +472,11 @@ typedef void (*NANO_EOI_GET_FUNC) (void *);
 #endif /* CONFIG_SSE */
 #endif /* CONFIG_FP_SHARING */
 
-extern int	irq_connect(unsigned int irq,
+extern int	irq_connect_dynamic(unsigned int irq,
 					 unsigned int priority,
 					 void (*routine)(void *parameter),
-					 void *parameter);
+					 void *parameter,
+					 uint32_t flags);
 
 /**
  * @brief Enable a specific IRQ
@@ -406,10 +510,10 @@ extern void	nano_cpu_idle(void);
 
 /** Nanokernel provided routine to report any detected fatal error. */
 extern FUNC_NORETURN void _NanoFatalErrorHandler(unsigned int reason,
-						 const NANO_ESF *pEsf);
+						 const NANO_ESF * pEsf);
 /** User provided routine to handle any detected fatal error post reporting. */
 extern FUNC_NORETURN void _SysFatalErrorHandler(unsigned int reason,
-						const NANO_ESF *pEsf);
+						const NANO_ESF * pEsf);
 /** Dummy ESF for fatal errors that would otherwise not have an ESF */
 extern const NANO_ESF _default_esf;
 
@@ -419,18 +523,24 @@ extern const NANO_ESF _default_esf;
  * This routine is invoked by the kernel to configure an interrupt vector of
  * the specified priority.  To this end, it allocates an interrupt vector,
  * programs hardware to route interrupt requests on the specified IRQ to that
- * vector, and returns the vector number along with its associated BOI/EOI
- * information.
+ * vector, and returns the vector number
  */
 extern int _SysIntVecAlloc(unsigned int irq,
-			 unsigned int priority,
-			 NANO_EOI_GET_FUNC *boiRtn,
-			 NANO_EOI_GET_FUNC *eoiRtn,
-			 void **boiRtnParm,
-			 void **eoiRtnParm,
-			 unsigned char *boiParamRequired,
-			 unsigned char *eoiParamRequired
-			 );
+			   unsigned int priority,
+			   uint32_t flags);
+
+/**
+ *
+ * @brief Program interrupt controller
+ *
+ * This routine programs the interrupt controller with the given vector
+ * based on the given IRQ parameter.
+ *
+ * Drivers call this routine instead of IRQ_CONNECT() when interrupts are
+ * configured statically.
+ *
+ */
+extern void _SysIntVecProgram(unsigned int vector, unsigned int irq, uint32_t flags);
 
 /* functions provided by the kernel for usage by _SysIntVecAlloc() */
 
@@ -451,5 +561,9 @@ extern void	_IntVecMarkFree(unsigned int vector);
 #define SYS_X86_RST_CNT_SYS_RST 0x02
 #define SYS_X86_RST_CNT_CPU_RST 0x4
 #define SYS_X86_RST_CNT_FULL_RST 0x08
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _ARCH_IFACE_H */

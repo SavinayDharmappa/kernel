@@ -1,5 +1,3 @@
-/* segselect.h - IA-32 segment selector header */
-
 /*
  * Copyright (c) 2012-2014, Wind River Systems, Inc.
  *
@@ -16,10 +14,12 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-This header contains the IA-32 segment selector defintions. These are extracted
-into their own file so they can be shared with the host tools.
+/**
+ * @file
+ * @brief IA-32 segment selector header
+ *
+ * This header contains the IA-32 segment selector defintions. These are
+ * extracted into their own file so they can be shared with the host tools.
  */
 
 #ifndef _SEGSELECT_H
@@ -27,9 +27,9 @@ into their own file so they can be shared with the host tools.
 
 /*
  * Segment selector macros for the various entries in the GDT.  These are
- * actually byte offsets from the start of the entry table (tGdtHeader->pEntries)
- * that are loaded into the appropriate CPU segment register (along with the
- * appropriate T bit and privilege level bits).
+ * actually byte offsets from the start of the entry table
+ * (tGdtHeader->pEntries) that are loaded into the appropriate CPU segment
+ * register (along with the appropriate T bit and privilege level bits).
  *
  * When referencing a specific GDT descriptor via tGdtHeader->pEntries, use
  * XXX_SEG_SELECTOR/sizeof(tGdtDesc)

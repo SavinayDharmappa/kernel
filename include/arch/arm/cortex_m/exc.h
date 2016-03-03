@@ -1,5 +1,3 @@
-/* cortex_m/exc.h - Cortex-M public exception handling */
-
 /*
  * Copyright (c) 2013-2014 Wind River Systems, Inc.
  *
@@ -16,54 +14,26 @@
  * limitations under the License.
  */
 
-/*
-DESCRIPTION
-ARM-specific nanokernel exception handling interface. Included by ARM/arch.h.
+/**
+ * @file
+ * @brief Cortex-M public exception handling
+ *
+ * ARM-specific nanokernel exception handling interface. Included by ARM/arch.h.
  */
 
 #ifndef _ARCH_ARM_CORTEXM_EXC_H_
 #define _ARCH_ARM_CORTEXM_EXC_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef _ASMLANGUAGE
 GTEXT(_ExcExit);
-
-/* Reimplements _ScbIsNestedExc() and fetches the ESF on the correct stack. */
-
-#include <arch/arm/cortex_m/asm_inline_gcc.h>
-
-.macro _asm_get_esf s e /* s: scratch, e: ESF returned */
-
-    ldr \s, =_SCS_ICSR
-    ldr \s, [\s]
-    ands.w \s, #_SCS_ICSR_RETTOBASE
-
-	ite eq			/* is the RETTOBASE bit zero ? */
-	mrseq \e, MSP	/* if so, we're not returning to thread mode, thus this
-					 * is a nested exception: the stack frame is on the MSP */
-	mrsne \e, PSP	/* if not, we are returning to thread mode, thus this is
-					 * not a nested exception: the stack frame is on the PSP */
-
-.endm
-
 #else
 #include <stdint.h>
 
 struct __esf {
-
-	/* part of exception stack frame created in software */
-#if CONFIG_ARM_DEBUG_ESF
-	sys_define_gpr_with_alias(sp, r13);
-	sys_define_gpr_with_alias(v1, r4);
-	sys_define_gpr_with_alias(v2, r5);
-	sys_define_gpr_with_alias(v3, r6);
-	sys_define_gpr_with_alias(v4, r7);
-	sys_define_gpr_with_alias(v5, r8);
-	sys_define_gpr_with_alias(v6, r9);
-	sys_define_gpr_with_alias(v7, r10);
-	sys_define_gpr_with_alias(v8, r11);
-#endif
-
-	/* part of exception stack frame pushed by the CPU */
 	sys_define_gpr_with_alias(a1, r0);
 	sys_define_gpr_with_alias(a2, r1);
 	sys_define_gpr_with_alias(a3, r2);
@@ -72,11 +42,9 @@ struct __esf {
 	sys_define_gpr_with_alias(lr, r14);
 	sys_define_gpr_with_alias(pc, r15);
 	uint32_t xpsr;
-
 };
 
 typedef struct __esf NANO_ESF;
-typedef struct __esf NANO_ISF;
 
 extern const NANO_ESF _default_esf;
 
@@ -134,4 +102,9 @@ extern void sys_exc_esf_dump(NANO_ESF *esf);
 #endif
 
 #endif /* _ASMLANGUAGE */
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _ARCH_ARM_CORTEXM_EXC_H_ */

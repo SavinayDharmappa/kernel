@@ -1,7 +1,7 @@
 /** @file
- @brief IPv6 and IPv4 definitions
-
- Generic IPv6 and IPv4 address definitions.
+ * @brief IPv6 and IPv4 definitions
+ *
+ * Generic IPv6 and IPv4 address definitions.
  */
 
 /*
@@ -24,6 +24,10 @@
 #define __NET_IP_H
 
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** Protocol families */
 #define PF_UNSPEC	0	/* Unspecified.  */
@@ -78,8 +82,10 @@ struct net_addr {
 	};
 };
 
-#define IN6ADDR_ANY_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } } }
-#define IN6ADDR_LOOPBACK_INIT { { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } } }
+#define IN6ADDR_ANY_INIT { { { 0, 0, 0, 0, 0, 0, 0, 0, 0, \
+				0, 0, 0, 0, 0, 0, 0 } } }
+#define IN6ADDR_LOOPBACK_INIT { { { 0, 0, 0, 0, 0, 0, 0, \
+				0, 0, 0, 0, 0, 0, 0, 0, 1 } } }
 
 #define INET6_ADDRSTRLEN 46
 
@@ -98,5 +104,9 @@ struct net_tuple {
 	/** IP protocol */
 	enum ip_protocol ip_proto;
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __NET_IP_H */
