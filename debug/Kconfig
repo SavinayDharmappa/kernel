@@ -1,0 +1,64 @@
+# gdbserver.kconf - Generic GDB server configuration options
+
+# Copyright (c) 2015, Wind River Systems, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# Generic Debugging Options
+#
+
+config DEBUG_INFO
+	bool "Enable system debugging information"
+	default n
+	help
+	This option enables the addition of various information that can be used
+	by debuggers in debugging the system.
+
+# GDB Server options
+#
+
+config	GDB_SERVER
+	bool
+	prompt "Enable GDB Server [EXPERIMENTAL]"
+	default n
+	select CACHE_FLUSHING
+	select DEBUG_INFO
+	select MEM_SAFE
+	select REBOOT
+	help
+	This option enables the GDB Server support.
+
+config GDB_SERVER_MAX_SW_BP
+	int "Maximum number of GDB Server Software breakpoints"
+	default 100
+	depends on GDB_SERVER
+	help
+	This option specifies the maximum number of Software breakpoints
+
+config	GDB_SERVER_INTERRUPT_DRIVEN
+	bool
+	prompt "Enable GDB interrupt mode"
+	default y
+	depends on GDB_SERVER
+	select CONSOLE_HANDLER
+	help
+	This option enables interrupt support for GDB Server.
+
+config	GDB_SERVER_BOOTLOADER
+	bool
+	prompt "Enable the bootloader mode"
+	default n
+	depends on GDB_SERVER
+	help
+	This option enables the bootloader mode of the GDB Server.

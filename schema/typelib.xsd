@@ -1,0 +1,35 @@
+<xs:schema xmlns="http://www.windriver.com/vxmicro"
+		xmlns:xs="http://www.w3.org/2001/XMLSchema"
+        targetNamespace="http://www.windriver.com/vxmicro"
+        elementFormDefault="qualified"
+        attributeFormDefault="unqualified">
+
+    <xs:simpleType name="int_0_63">
+    	<xs:restriction base="xs:integer">
+    		<xs:minInclusive value="0"/>
+    		<xs:maxInclusive value="63"/>
+    	</xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="int_0_2GB_minus_1">
+    	<xs:restriction base="xs:integer">
+    		<xs:minInclusive value="0"/>
+    		<xs:maxInclusive value="2147483647"/>
+    	</xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="int_1_2GB_minus_1">
+    	<xs:restriction base="xs:integer">
+    		<xs:minInclusive value="1"/>
+    		<xs:maxInclusive value="2147483647"/>
+    	</xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="int_4_2GB_minus_4">
+    	<xs:restriction base="xs:integer">
+    		<xs:minInclusive value="4"/>
+    		<xs:maxInclusive value="2147483644"/>
+    	</xs:restriction>
+    </xs:simpleType>
+
+</xs:schema> 

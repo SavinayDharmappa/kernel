@@ -1,0 +1,31 @@
+% Application       : #PRJNAME#
+
+% TASKGROUP NAME
+% ==============
+
+% TASK NAME         PRIO ENTRY           STACK GROUPS
+% ===================================================
+
+% FIFO NAME         DEPTH WIDTH
+% =============================
+
+% SEMA NAME
+% =========
+
+% MUTEX NAME
+% ==========
+
+% MAILBOX NAME
+% ============
+
+% PIPE NAME            BUFFERSIZE
+% ===============================
+
+% MAP  NAME         BLOCKS BLOCKSIZE
+% ==================================
+
+% POOL NAME         MIN  MAX   NMAX
+% =================================
+
+% EVENT NAME        ENTRY
+% =======================

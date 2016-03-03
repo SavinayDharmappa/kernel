@@ -1,0 +1,81 @@
+# Kconfig - x86 core configuration options
+
+#
+# Copyright (c) 2014-2015 Wind River Systems, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+menu "x86 Core Options"
+
+config NO_ISRS
+	bool
+	prompt "No Asynchronous Interrupts"
+	default n
+	help
+	This option disables asynchronous interrupts support.
+
+
+config NO_NESTED_INTERRUPTS
+	bool
+	prompt "Enable nested interrupts"
+	default n
+	depends on X86_32
+	help
+	disable nest interrupts.
+
+
+menu "Memory Layout Options"
+
+config IDT_NUM_VECTORS
+	int
+	prompt "Number of IDT vectors"
+	default 256
+	range 32 256
+	depends on !NO_ISRS
+	help
+	This option specifies the number of interrupt vector entries in the
+	Interrupt Descriptor Table (IDT). By default all 256 vectors are
+	supported in an IDT requiring 2048 bytes of memory.
+
+config NUM_GDT_SPARE_ENTRIES
+	int
+	prompt "Number of spare GDT entries"
+	default 0
+	help
+	This option specifies the number of spare entries in the Global
+	Descriptor Table (GDT).
+
+config PHYS_LOAD_ADDR
+	hex "Physical load address"
+	# Default value must be supplied by platform
+	help
+	This option specifies the physical address where the kernel is loaded.
+
+endmenu
+
+choice
+prompt "Reboot implementation"
+default REBOOT_RST_CNT
+depends on REBOOT
+
+config REBOOT_RST_CNT
+	bool
+	prompt "Use the RST_CNT register"
+	help
+	Reboot using the legacy method of writing to the RST_CNT register
+	(I/O port 0xcf9). A cold reboot is performed, going back to the BIOS.
+
+endchoice
+
+endmenu

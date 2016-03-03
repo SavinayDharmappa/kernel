@@ -1,0 +1,168 @@
+# Kconfig - serial driver configuration options
+
+#
+# Copyright (c) 2014-2015 Wind River Systems, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+menuconfig SERIAL
+	bool
+	prompt "Serial Drivers"
+	default n
+	help
+	Enable options for serial drivers.
+
+if SERIAL
+
+config SERIAL_HAS_DRIVER
+	bool
+	default n
+	help
+	This is an option to be enabled by individual serial driver
+	to signal that there is a serial driver. This is being used
+	by other drivers which are dependent on serial.
+
+menu "Serial Port Options"
+
+config SERIAL_INTERRUPT_LEVEL
+	bool "Serial interrupt level"
+	depends on IOAPIC
+	default y
+	help
+	Option signifies that the serial controller uses level interrupts
+	instead of edge
+
+config SERIAL_INTERRUPT_LOW
+	bool "Serial interrupt low"
+	depends on IOAPIC
+	default n
+	help
+	Option signifies that the serial controller uses low level interrupts
+	instead of high
+
+config  UART_INTERRUPT_DRIVEN
+	bool
+	prompt "Interrupt driven UART support"
+	default n
+	help
+	This option enables interrupt support for UART allowing console
+	input and UART based drivers.
+endmenu
+
+config NS16550
+	bool "NS16550 serial driver"
+	default n
+	select SERIAL_HAS_DRIVER
+	help
+	This option enables the NS16550 serial driver.
+	This driver can be used for the serial hardware
+	available on x86 platforms such as basic_atom and
+	basic_minuteia.
+
+config NS16550_PCI
+	bool "NS16550 PCI serial driver"
+	default n
+	depends on PCI && NS16550
+	help
+	This enables NS16550 to probe for PCI-based serial devices.
+
+	This option enables the driver to auto-detect the device
+	configuration required to access those ports.
+
+config NS16550_PORT_0_BASE_ADDR
+	hex "NS16550 port 0 PCI base address"
+	default 0x00000000
+	depends on NS16550_PCI
+
+config NS16550_PORT_1_BASE_ADDR
+	hex "NS16550 port 1 PCI base address"
+	default 0x00000000
+	depends on NS16550_PCI
+
+config K20_UART
+	bool "K20 serial driver"
+	default n
+	select SERIAL_HAS_DRIVER
+	help
+	This option enables the K20 serial driver.
+	This specific driver can be used for the serial hardware
+	available at the Freescale FRDM K64F platform.
+
+config STELLARIS_UART
+	bool "Stellaris serial driver"
+	default n
+	select SERIAL_HAS_DRIVER
+	help
+	This option enables the Stellaris serial driver.
+	This specific driver can be used for the serial hardware
+	available at the Texas Instrument LM3S6965 platform.
+
+
+config UART_PORT_0_NAME
+	string
+	default "UART_0"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_1_NAME
+	string
+	default "UART_1"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_2_NAME
+	string
+	default "UART_2"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_3_NAME
+	string
+	default "UART_3"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_4_NAME
+	string
+	default "UART_4"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_5_NAME
+	string
+	default "UART_5"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_6_NAME
+	string
+	default "UART_6"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+config UART_PORT_7_NAME
+	string
+	default "UART_7"
+	help
+	This is the device name for UART, and is included in the device
+	struct.
+
+endif

@@ -1,0 +1,102 @@
+# Kconfig - console driver configuration options
+
+#
+# Copyright (c) 2014-2015 Wind River Systems, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+menuconfig CONSOLE
+	bool
+	prompt "Console drivers"
+
+if CONSOLE
+
+config CONSOLE_HAS_DRIVER
+	bool
+	default n
+	help
+	This is an option to be enabled by console drivers to signal
+	that some kind of console exists.
+
+config CONSOLE_HANDLER
+	bool
+	prompt "Enable console input handler"
+	select UART_INTERRUPT_DRIVEN
+	default n
+	help
+	This option enables console input handler allowing to write simple
+	interaction between serial console and the OS.
+
+config UART_CONSOLE
+	bool
+	prompt "Use UART for console"
+	default n
+	depends on SERIAL && SERIAL_HAS_DRIVER
+	select CONSOLE_HAS_DRIVER
+	help
+	Enable this option to use one UART for console. Make sure
+	CONFIG_UART_CONSOLE_INDEX is also set correctly.
+
+config UART_CONSOLE_INDEX
+	int "UART Console Index"
+	default 0
+	depends on UART_CONSOLE
+	help
+	This option specifies index for the console uart port.
+
+config UART_CONSOLE_BAUDRATE
+	int "UART Console Baud Rate"
+	default 115200
+	depends on UART_CONSOLE
+	help
+	This specifies the baud rate for the UART console.
+
+	Default is 115200, which should be usable for most RS232
+	and USB adapters.
+
+config RAM_CONSOLE
+	bool
+	prompt "Use RAM console"
+	select CONSOLE_HAS_DRIVER
+	default n
+	help
+	Emit console messages to a RAM buffer "ram_console" which can
+	be examined at runtime with a debugger. Useful in board bring-up
+	if there aren't any working serial drivers.
+
+config RAM_CONSOLE_BUFFER_SIZE
+	int "Ram Console buffer size"
+	default 1024
+	depends on RAM_CONSOLE
+	help
+	Size of the RAM console buffer. Messages will wrap around if the
+	length is exceeded.
+
+config IPI_CONSOLE_SENDER
+	bool
+	prompt "Inter-processor Interrupt console sender"
+	select CONSOLE_HAS_DRIVER
+	default n
+	help
+	Enable the sending side of IPI console
+
+config IPI_CONSOLE_RECEIVER
+	bool
+	prompt "Inter-processor interrupt console receiver"
+	select RING_BUFFER
+	default n
+	help
+	Enable the receiving side of IPI console
+
+endif
